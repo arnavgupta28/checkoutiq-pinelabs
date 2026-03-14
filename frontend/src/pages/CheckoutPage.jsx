@@ -49,13 +49,13 @@ const MODE_ICONS = {
   BANK_TRANSFER: '🏛️', OTHERS: '➕',
 }
 
-function PaymentModesGrid({ modes, recommended }) {
+function PaymentModesGrid({ modes, recommended, selectable, selectedMode, onSelectMode }) {
   if (!modes?.length) return null
   const bestSaving = Math.max(...modes.filter(m => m.available).map(m => m.best_saving_paise || 0))
   return (
     <div style={{ marginBottom: 16 }}>
       <p style={{ fontSize: 11, fontWeight: 700, color: PL.muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-        Payment Methods — Offers &amp; Availability
+        Payment Methods — {selectable ? 'Select a method or use Smart Apply' : 'Offers & Availability'}
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
         {modes.map(mode => {
@@ -66,19 +66,35 @@ function PaymentModesGrid({ modes, recommended }) {
           )
           const isAlt = !isRecommended && mode.available && mode.best_saving_paise > 0 && mode.best_saving_paise === bestSaving && bestSaving > 0
           const isNA = !mode.available
+          const isSelected = selectable && selectedMode === mode.mode
           return (
-            <div key={mode.mode} style={{
-              borderRadius: 10, padding: '10px 8px',
-              border: `1.5px solid ${isRecommended ? PL.mint : PL.border}`,
-              background: isRecommended ? `${PL.mint}15` : isNA ? `${PL.green}03` : PL.white,
-              opacity: isNA ? 0.5 : 1,
-              position: 'relative', overflow: 'hidden',
-            }}>
+            <div key={mode.mode}
+              onClick={() => selectable && mode.available && onSelectMode?.(isSelected ? null : mode.mode)}
+              style={{
+                borderRadius: 10, padding: '10px 8px',
+                border: `1.5px solid ${isSelected ? PL.violet : isRecommended ? PL.mint : PL.border}`,
+                background: isSelected ? `${PL.violet}12` : isRecommended ? `${PL.mint}15` : isNA ? `${PL.green}03` : PL.white,
+                opacity: isNA ? 0.5 : 1,
+                position: 'relative', overflow: 'hidden',
+                cursor: selectable && mode.available ? 'pointer' : 'default',
+                transition: 'all 0.15s',
+              }}>
               {isRecommended && (
                 <div style={{ position: 'absolute', top: 0, right: 0, background: PL.mint, color: PL.green, fontSize: 8, fontWeight: 800, padding: '2px 6px', borderBottomLeftRadius: 6 }}>BEST</div>
               )}
               {isAlt && (
                 <div style={{ position: 'absolute', top: 0, right: 0, background: PL.yellow, color: '#fff', fontSize: 8, fontWeight: 800, padding: '2px 6px', borderBottomLeftRadius: 6 }}>ALT</div>
+              )}
+              {selectable && mode.available && (
+                <div style={{
+                  position: 'absolute', top: 6, left: 6,
+                  width: 14, height: 14, borderRadius: '50%',
+                  border: `2px solid ${isSelected ? PL.violet : PL.border}`,
+                  background: isSelected ? PL.violet : 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {isSelected && <div style={{ width: 6, height: 6, borderRadius: '50%', background: PL.white }} />}
+                </div>
               )}
               <div style={{ fontSize: 18, marginBottom: 3 }}>{MODE_ICONS[mode.mode] || '💳'}</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: PL.green, marginBottom: 2, lineHeight: 1.2 }}>{mode.label}</div>
@@ -87,6 +103,13 @@ function PaymentModesGrid({ modes, recommended }) {
               </div>
               {mode.best_saving_paise > 0 && (
                 <div style={{ fontSize: 9, color: PL.mint, fontWeight: 700, marginTop: 2 }}>Save ₹{(mode.best_saving_paise / 100).toFixed(0)}</div>
+              )}
+              {mode.you_pay_paise != null && mode.available && (
+                <div style={{ fontSize: 8, color: PL.muted, marginTop: 2, lineHeight: 1.2 }}>
+                  {mode.emi_detail
+                    ? `₹${(mode.emi_detail.monthly_paise / 100).toFixed(0)}/mo × ${mode.emi_detail.tenure_months}`
+                    : `Pay ₹${(mode.you_pay_paise / 100).toLocaleString('en-IN')}`}
+                </div>
               )}
             </div>
           )
@@ -111,6 +134,11 @@ export default function CheckoutPage() {
   const [showCatalog, setShowCatalog] = useState(false)
   const [selectedCardIdx, setSelectedCardIdx] = useState(0)
   const [txnId, setTxnId] = useState(null)
+  const [selectedMode, setSelectedMode] = useState(null)
+  const [manualRec, setManualRec] = useState(null)
+
+  // Use manual recommendation if set, otherwise use WS recommendation
+  const activeRecommendation = manualRec || recommendation
 
   const totalPaise = useMemo(
     () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
@@ -199,6 +227,8 @@ export default function CheckoutPage() {
   }
 
   const handleSmartApply = async () => {
+    setManualRec(null)  // Clear any manual selection
+    setSelectedMode(null)
     setPhase('analysing')
     await triggerSmartApply({
       session_id: sessionId,
@@ -217,7 +247,7 @@ export default function CheckoutPage() {
 
   // Save transaction to localStorage and generate ID when payment completes
   useEffect(() => {
-    if (phase === 'done' && recommendation && !txnId) {
+    if (phase === 'done' && activeRecommendation && !txnId) {
       const id = `TXN-${Date.now().toString(36).toUpperCase()}`
       setTxnId(id)
       try {
@@ -226,9 +256,9 @@ export default function CheckoutPage() {
           timestamp: new Date().toISOString(),
           cart_items: cart.map(i => ({ name: i.name, image: i.image, price: i.price, quantity: i.quantity })),
           total_paise: totalPaise,
-          saving_paise: recommendation.net_saving_paise || 0,
-          paid_paise: recommendation.effective_amount_paise || totalPaise,
-          payment_method: recommendation.recommended_method || 'CARD',
+          saving_paise: activeRecommendation.net_saving_paise || 0,
+          paid_paise: activeRecommendation.effective_amount_paise || totalPaise,
+          payment_method: activeRecommendation.recommended_method || 'CARD',
           session_id: sessionId,
         }
         const prev = JSON.parse(localStorage.getItem('checkoutiq_transactions') || '[]')
@@ -236,17 +266,17 @@ export default function CheckoutPage() {
       } catch (_) {}
     }
     if (phase !== 'done') setTxnId(null)
-  }, [phase, recommendation])
+  }, [phase, activeRecommendation])
 
   const handleApply = async () => {
     setApplying(true)
     // Record the offer chosen for popularity tracking
-    if (recommendation?.offer_id && sessionId) {
+    if (activeRecommendation?.offer_id && sessionId) {
       try {
         await recordOfferChosen(
-          recommendation.offer_id,
-          recommendation.recommended_card_hint || 'unknown',
-          recommendation.net_saving_paise || 0
+          activeRecommendation.offer_id,
+          activeRecommendation.recommended_card_hint || 'unknown',
+          activeRecommendation.net_saving_paise || 0
         )
       } catch (_) {}
     }
@@ -475,7 +505,52 @@ export default function CheckoutPage() {
           </div>
 
           {/* ── All payment modes with estimated offers ─── */}
-          <PaymentModesGrid modes={precomputedModes} recommended={null} />
+          <PaymentModesGrid
+            modes={precomputedModes}
+            recommended={null}
+            selectable={true}
+            selectedMode={selectedMode}
+            onSelectMode={setSelectedMode}
+          />
+
+          {selectedMode && (
+            <button onClick={() => {
+              // Direct pay with selected mode — skip Smart Apply
+              const mode = precomputedModes.find(m => m.mode === selectedMode)
+              const saving = mode?.best_saving_paise || 0
+              const eff = totalPaise - saving
+              const directRec = {
+                recommended_method: selectedMode === 'EMI' ? 'CREDIT_EMI' : selectedMode,
+                offer_id: null,
+                tenure_id: null,
+                net_saving_paise: saving,
+                effective_amount_paise: eff,
+                reason_trail: [
+                  `✅ You chose ${mode?.label || selectedMode} manually`,
+                  saving > 0 ? `💰 Estimated saving: ₹${(saving/100).toFixed(0)}` : '💰 No special offer on this method',
+                  mode?.emi_detail ? `📅 ${mode.emi_detail.tenure_months} months × ₹${(mode.emi_detail.monthly_paise/100).toFixed(0)}/mo` : `💳 Pay ₹${(eff/100).toLocaleString('en-IN')}`,
+                ],
+                alternatives: [],
+                source: 'manual_selection',
+                mode_breakdown: precomputedModes,
+              }
+              setManualRec(directRec)
+              setPhase('recommendation')
+            }}
+            style={{
+              width: '100%',
+              background: PL.violet,
+              color: PL.white, border: 'none', borderRadius: 12, padding: '14px 0',
+              fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              boxShadow: `0 4px 16px ${PL.violet}30`, transition: 'transform 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              💳 Pay with {precomputedModes.find(m => m.mode === selectedMode)?.label || selectedMode}
+            </button>
+          )}
 
           <button onClick={handleSmartApply}
             style={{
@@ -525,16 +600,29 @@ export default function CheckoutPage() {
       {/* ── RECOMMENDATION PHASE ───────────────────────────────── */}
       {phase === 'recommendation' && (
         <div>
-          <div style={{ ...cardStyle, marginBottom: 16 }}>
-            <AgentProgressBar agentStatus={agentStatus} wave1={WAVE_1} wave2={WAVE_2} wave3={WAVE_3} events={events} />
-          </div>
-          {recommendation?.mode_breakdown?.length > 0 && (
+          {!manualRec && (
+            <div style={{ ...cardStyle, marginBottom: 16 }}>
+              <AgentProgressBar agentStatus={agentStatus} wave1={WAVE_1} wave2={WAVE_2} wave3={WAVE_3} events={events} />
+            </div>
+          )}
+          {manualRec && (
+            <div style={{ ...cardStyle, marginBottom: 16, background: `${PL.violet}08`, borderColor: `${PL.violet}30` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16 }}>✋</span>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: PL.green, margin: 0 }}>Manual Selection</p>
+                  <p style={{ fontSize: 11, color: PL.muted, margin: 0 }}>You chose this payment method. Use Smart Apply for AI-optimised recommendation.</p>
+                </div>
+              </div>
+            </div>
+          )}
+          {activeRecommendation?.mode_breakdown?.length > 0 && (
             <PaymentModesGrid
-              modes={recommendation.mode_breakdown}
-              recommended={recommendation.recommended_method}
+              modes={activeRecommendation.mode_breakdown}
+              recommended={activeRecommendation.recommended_method}
             />
           )}
-          <RecommendationCard recommendation={recommendation} onApply={handleApply} loading={applying} />
+          <RecommendationCard recommendation={activeRecommendation} onApply={handleApply} loading={applying} totalPaise={totalPaise} />
         </div>
       )}
 
@@ -560,15 +648,15 @@ export default function CheckoutPage() {
               <span style={{ color: PL.muted }}>Subtotal</span>
               <span style={{ color: PL.green, fontWeight: 600 }}>₹{(totalPaise / 100).toLocaleString('en-IN')}</span>
             </div>
-            {(recommendation?.net_saving_paise || 0) > 0 && (
+            {(activeRecommendation?.net_saving_paise || 0) > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 12 }}>
-                <span style={{ color: PL.teal, fontWeight: 700 }}>✦ Smart Apply savings</span>
-                <span style={{ color: PL.teal, fontWeight: 700 }}>−₹{(recommendation.net_saving_paise / 100).toFixed(0)}</span>
+                <span style={{ color: PL.teal, fontWeight: 700 }}>✦ {manualRec ? 'Savings' : 'Smart Apply savings'}</span>
+                <span style={{ color: PL.teal, fontWeight: 700 }}>−₹{(activeRecommendation.net_saving_paise / 100).toFixed(0)}</span>
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0 0', borderTop: `2px solid ${PL.border}`, fontSize: 15, fontWeight: 800 }}>
               <span style={{ color: PL.green }}>You Paid</span>
-              <span style={{ color: PL.mint }}>₹{((recommendation?.effective_amount_paise || totalPaise) / 100).toLocaleString('en-IN')}</span>
+              <span style={{ color: PL.mint }}>₹{((activeRecommendation?.effective_amount_paise || totalPaise) / 100).toLocaleString('en-IN')}</span>
             </div>
           </div>
 
@@ -576,7 +664,7 @@ export default function CheckoutPage() {
           <div style={{ ...cardStyle, marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
               <span style={{ color: PL.muted }}>Payment method</span>
-              <span style={{ color: PL.green, fontWeight: 600 }}>{METHOD_LABELS[recommendation?.recommended_method] || recommendation?.recommended_method || 'Card'}</span>
+              <span style={{ color: PL.green, fontWeight: 600 }}>{METHOD_LABELS[activeRecommendation?.recommended_method] || activeRecommendation?.recommended_method || 'Card'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
               <span style={{ color: PL.muted }}>Transaction ID</span>
@@ -584,18 +672,18 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {(recommendation?.net_saving_paise || 0) > 0 && (
+          {(activeRecommendation?.net_saving_paise || 0) > 0 && (
             <div style={{ background: `${PL.mint}18`, border: `1px solid ${PL.mint}40`, borderRadius: 12, padding: '12px 16px', marginBottom: 14, textAlign: 'center' }}>
               <p style={{ fontSize: 13, color: PL.green, fontWeight: 600, margin: 0 }}>
                 🎉 CheckoutIQ saved you{' '}
-                <span style={{ color: PL.mint, fontWeight: 900, fontSize: 17 }}>₹{(recommendation.net_saving_paise / 100).toFixed(0)}</span>
+                <span style={{ color: PL.mint, fontWeight: 900, fontSize: 17 }}>₹{(activeRecommendation.net_saving_paise / 100).toFixed(0)}</span>
                 {' '}on this order!
               </p>
             </div>
           )}
 
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => { setPhase('cart'); setSessionId(null) }}
+            <button onClick={() => { setPhase('cart'); setSessionId(null); setManualRec(null); setSelectedMode(null) }}
               style={{ flex: 1, background: `${PL.green}10`, border: `1px solid ${PL.border}`, borderRadius: 10, padding: '11px 0', fontSize: 13, fontWeight: 600, color: PL.green, cursor: 'pointer' }}>
               ← New Order
             </button>

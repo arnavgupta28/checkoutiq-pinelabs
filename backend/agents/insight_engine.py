@@ -290,31 +290,45 @@ def _compute_mode_breakdown(
     modes.append({
         "mode": "UPI", "label": "UPI", "available": True,
         "best_offer_pct": 2.0, "best_offer_label": "2% cashback",
-        "best_saving_paise": upi_saving, "emi_detail": None,
+        "best_saving_paise": upi_saving,
+        "you_pay_paise": amount_paise - upi_saving,
+        "you_pay_label": f"₹{(amount_paise - upi_saving)/100:.0f} after cashback",
+        "emi_detail": None,
     })
 
     # ── Credit / Debit Card — from actual offer discovery ─────────────────────
     eligible = [o for o in offer_insights if o.get("eligible") and o["discount_paise"] > 0]
     if eligible:
         best = max(eligible, key=lambda x: x["discount_paise"])
+        you_pay = amount_paise - best["discount_paise"]
         modes.append({
             "mode": "CARD", "label": "Credit/Debit Card", "available": True,
             "best_offer_pct": best["discount_pct"],
             "best_offer_label": f"{best['discount_pct']}% off · {best['bank']}",
-            "best_saving_paise": best["discount_paise"], "emi_detail": None,
+            "best_saving_paise": best["discount_paise"],
+            "you_pay_paise": you_pay,
+            "you_pay_label": f"₹{you_pay/100:.0f} after {best['discount_pct']}% off",
+            "emi_detail": None,
         })
     else:
         modes.append({
             "mode": "CARD", "label": "Credit/Debit Card", "available": True,
             "best_offer_pct": 0.0, "best_offer_label": "No offers for your card",
-            "best_saving_paise": 0, "emi_detail": None,
+            "best_saving_paise": 0,
+            "you_pay_paise": amount_paise,
+            "you_pay_label": f"₹{amount_paise/100:.0f} (no discount)",
+            "emi_detail": None,
         })
 
     # ── Net Banking — 5% off (standard Pine Labs NB partner offer) ────────────
+    nb_saving = int(amount_paise * 0.05)
     modes.append({
         "mode": "NET_BANKING", "label": "Net Banking", "available": True,
         "best_offer_pct": 5.0, "best_offer_label": "5% off on net banking",
-        "best_saving_paise": int(amount_paise * 0.05), "emi_detail": None,
+        "best_saving_paise": nb_saving,
+        "you_pay_paise": amount_paise - nb_saving,
+        "you_pay_label": f"₹{(amount_paise - nb_saving)/100:.0f} after 5% off",
+        "emi_detail": None,
     })
 
     # ── EMI — always shown as monthly amount, never as "0 downpayment" ─────────
@@ -331,6 +345,8 @@ def _compute_mode_breakdown(
             "mode": "EMI", "label": "EMI", "available": True,
             "best_offer_pct": 0.0, "best_offer_label": label,
             "best_saving_paise": 0,
+            "you_pay_paise": total,
+            "you_pay_label": f"₹{monthly/100:.0f}/mo × {months} = ₹{total/100:.0f} total",
             "emi_detail": {
                 "monthly_paise": monthly, "tenure_months": months,
                 "total_paise": total, "extra_cost_paise": extra,
@@ -343,44 +359,58 @@ def _compute_mode_breakdown(
             "mode": "EMI", "label": "EMI", "available": avail,
             "best_offer_pct": 0.0,
             "best_offer_label": "Min order ₹3,000 required" if not avail else "No EMI offers",
-            "best_saving_paise": 0, "emi_detail": None,
+            "best_saving_paise": 0,
+            "you_pay_paise": amount_paise,
+            "you_pay_label": "N/A",
+            "emi_detail": None,
         })
 
     # ── Wallet — from user's actual wallet balances ───────────────────────────
     total_wallet = sum(v for v in wallet_balances.values() if v > 0)
     if total_wallet >= amount_paise:
+        wallet_saving = int(amount_paise * 0.05)
         modes.append({
             "mode": "WALLET", "label": "Wallet", "available": True,
             "best_offer_pct": 5.0,
             "best_offer_label": f"5% cashback · ₹{total_wallet/100:.0f} available",
-            "best_saving_paise": int(amount_paise * 0.05), "emi_detail": None,
+            "best_saving_paise": wallet_saving,
+            "you_pay_paise": amount_paise - wallet_saving,
+            "you_pay_label": f"₹{(amount_paise - wallet_saving)/100:.0f} from wallet",
+            "emi_detail": None,
         })
     elif total_wallet > 0:
+        card_portion = amount_paise - total_wallet
         modes.append({
             "mode": "WALLET", "label": "Wallet", "available": True,
             "best_offer_pct": 0.0,
             "best_offer_label": f"₹{total_wallet/100:.0f} available (partial + card)",
-            "best_saving_paise": 0, "emi_detail": None,
+            "best_saving_paise": 0,
+            "you_pay_paise": amount_paise,
+            "you_pay_label": f"₹{total_wallet/100:.0f} wallet + ₹{card_portion/100:.0f} card",
+            "emi_detail": None,
         })
     else:
         modes.append({
             "mode": "WALLET", "label": "Wallet", "available": False,
             "best_offer_pct": 0.0, "best_offer_label": "No wallet balance",
-            "best_saving_paise": 0, "emi_detail": None,
+            "best_saving_paise": 0,
+            "you_pay_paise": amount_paise,
+            "you_pay_label": "N/A",
+            "emi_detail": None,
         })
 
     # ── Brand Wallet, Pay by Points, Bank Transfer, Others ───────────────────
     modes.append({"mode": "BRAND_WALLET", "label": "Brand Wallet", "available": False,
                   "best_offer_pct": 0.0, "best_offer_label": "Not configured for merchant",
-                  "best_saving_paise": 0, "emi_detail": None})
+                  "best_saving_paise": 0, "you_pay_paise": amount_paise, "you_pay_label": "N/A", "emi_detail": None})
     modes.append({"mode": "PAY_BY_POINTS", "label": "Pay by Points", "available": False,
                   "best_offer_pct": 0.0, "best_offer_label": "No reward points linked",
-                  "best_saving_paise": 0, "emi_detail": None})
+                  "best_saving_paise": 0, "you_pay_paise": amount_paise, "you_pay_label": "N/A", "emi_detail": None})
     modes.append({"mode": "BANK_TRANSFER", "label": "Bank Transfer", "available": True,
                   "best_offer_pct": 0.0, "best_offer_label": "No offers · NEFT/RTGS",
-                  "best_saving_paise": 0, "emi_detail": None})
+                  "best_saving_paise": 0, "you_pay_paise": amount_paise, "you_pay_label": f"₹{amount_paise/100:.0f} (full amount)", "emi_detail": None})
     modes.append({"mode": "OTHERS", "label": "Others", "available": True,
                   "best_offer_pct": 0.0, "best_offer_label": "BNPL, PayLater options",
-                  "best_saving_paise": 0, "emi_detail": None})
+                  "best_saving_paise": 0, "you_pay_paise": amount_paise, "you_pay_label": f"₹{amount_paise/100:.0f}", "emi_detail": None})
 
     return modes

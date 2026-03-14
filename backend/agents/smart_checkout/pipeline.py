@@ -111,19 +111,33 @@ async def run_pipeline(
                 f"Review these pre-computed payment options for a Rs.{amount_paise/100:.0f} order. "
                 f"Check for mutually exclusive offers (same bank offers can't stack with other bank offers). "
                 f"Return the top 3 non-conflicting options ranked by saving.\n\n"
+                f"RANKING RULES (MUST follow in order):\n"
+                f"1. INSTANT_DISCOUNT offers with the highest net_saving_paise come FIRST — these save real money upfront.\n"
+                f"2. CASHBACK offers come second — real savings but delayed.\n"
+                f"3. Net Banking / UPI cashback offers come third if they beat card offers.\n"
+                f"4. EMI should ONLY be ranked high if the user cannot afford to pay upfront "
+                f"OR if it has genuinely higher net_saving_paise than instant discount options.\n"
+                f"5. No-Cost EMI has net_saving_paise=0 — it does NOT save money, it only spreads payment.\n\n"
                 f"PRE-COMPUTED OPTIONS:\n{insight_summary}"
             ),
             expected_output="JSON array: top 3 [{method, offer_id, tenure_id, net_saving_paise, conflict_notes}]",
             agent=Agent(
                 role="Offer Conflict Resolver",
-                goal="Identify offer conflicts and rank top non-conflicting payment configurations.",
-                backstory="Expert in Pine Labs offer stacking rules. BANK_OFFER from different banks never stack. BRAND_EMI + BRAND_OFFER can sometimes stack.",
+                goal="Identify offer conflicts and rank top non-conflicting payment configurations. Prefer INSTANT_DISCOUNT and CASHBACK over EMI when savings are equal or higher.",
+                backstory="Expert in Pine Labs offer stacking rules. BANK_OFFER from different banks never stack. BRAND_EMI + BRAND_OFFER can sometimes stack. You understand that EMI (even no-cost) doesn't save money — it just defers payment. Always prefer offers that reduce the total cost.",
                 llm=llm, verbose=False,
             ),
         )
         decision_task = Task(
             description=(
                 "Select the single best payment configuration from the resolved options. "
+                "IMPORTANT RULES:\n"
+                "- If an INSTANT_DISCOUNT or CASHBACK offer has the highest net_saving_paise, ALWAYS pick it over EMI.\n"
+                "- EMI should only be recommended when: (a) no instant discount exists, or (b) the monthly payment makes an otherwise unaffordable purchase possible.\n"
+                "- No-Cost EMI has 0 savings — never recommend it if any discount/cashback offer exists.\n"
+                "- For net_saving_paise, use the EXACT pre-computed value from the options. Do NOT invent values.\n"
+                "- effective_amount_paise = total_order_amount - net_saving_paise. Calculate it correctly.\n\n"
+                f"Total order amount: {amount_paise} paise (Rs.{amount_paise/100:.0f})\n\n"
                 "Output structured JSON with recommended_method, offer_id, tenure_id, "
                 "net_saving_paise, effective_amount_paise, and reason_trail (3-5 bullet points). "
                 "IMPORTANT: Output ONLY valid JSON, no explanation outside the JSON block."
@@ -131,8 +145,8 @@ async def run_pipeline(
             expected_output='{"recommended_method":"CARD","offer_id":"...","tenure_id":"...","net_saving_paise":0,"effective_amount_paise":0,"reason_trail":["..."],"alternatives":[]}',
             agent=Agent(
                 role="Final Decision Synthesiser",
-                goal="Produce one recommendation with transparent reason trail.",
-                backstory="Translates financial data into clear, trustworthy payment recommendations for Indian consumers.",
+                goal="Produce one recommendation with transparent reason trail. Prefer instant savings over EMI.",
+                backstory="Translates financial data into clear, trustworthy payment recommendations for Indian consumers. You never recommend EMI when an instant discount saves more money.",
                 llm=llm, verbose=False,
             ),
             context=[conflict_task],
@@ -163,7 +177,23 @@ async def run_pipeline(
         if match:
             parsed = json.loads(match.group())
             parsed["source"] = "llm_pipeline"
-            logger.info(f"[Layer1] LLM recommendation: method={parsed.get('recommended_method')} saving=Rs.{parsed.get('net_saving_paise',0)/100:.0f}")
+
+            # ── Validate & fix LLM output values ─────────────────────
+            # LLM often hallucinates effective_amount. Recompute from net_saving.
+            llm_saving = parsed.get("net_saving_paise", 0)
+            # Clamp saving to [0, amount_paise]
+            if llm_saving < 0 or llm_saving > amount_paise:
+                # Cross-check with insight engine's best option
+                best = insights.get("best_option")
+                if best and best.get("net_saving_paise"):
+                    llm_saving = best["net_saving_paise"]
+                else:
+                    llm_saving = min(max(llm_saving, 0), amount_paise)
+                parsed["net_saving_paise"] = llm_saving
+            # Always recompute effective_amount from validated saving
+            parsed["effective_amount_paise"] = amount_paise - llm_saving
+
+            logger.info(f"[Layer1] LLM recommendation: method={parsed.get('recommended_method')} saving=Rs.{parsed.get('net_saving_paise',0)/100:.0f} effective=Rs.{parsed.get('effective_amount_paise',0)/100:.0f}")
             await record_offer_chosen(
                 parsed.get("offer_id", ""),
                 insights["card"].get("bank", ""),

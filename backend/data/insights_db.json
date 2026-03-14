@@ -5,6 +5,18 @@
       "bank": "HDFC Bank",
       "total_saving_paise": 76998800,
       "last_chosen": "2026-03-14T11:11:02.610346+00:00"
+    },
+    "4101": {
+      "chosen_count": 1,
+      "bank": "HDFC Bank",
+      "total_saving_paise": 17474700,
+      "last_chosen": "2026-03-14T11:39:47.875050+00:00"
+    },
+    "3722": {
+      "chosen_count": 1,
+      "bank": "HDFC Bank",
+      "total_saving_paise": 100000,
+      "last_chosen": "2026-03-14T11:42:35.475406+00:00"
     }
   },
   "session_insights": {
@@ -373,6 +385,552 @@
       },
       "total_options_found": 6,
       "saved_at": "2026-03-14T11:09:32.019495+00:00"
+    },
+    "413d7c21-2cdf-4cae-a588-c00b471a8ebc": {
+      "card": {
+        "card_bin": "401200",
+        "card_type": "CREDIT",
+        "bank": "HDFC Bank",
+        "network": "Visa",
+        "tier": "Platinum",
+        "base_reward_pct": 1.5,
+        "estimated_reward_paise": 277495
+      },
+      "offers": [
+        {
+          "bank": "HDFC Bank",
+          "offer_name": "No Cost EMI + Instant Cashback",
+          "offer_id": "3722",
+          "tenure_id": "7",
+          "program_type": "BRAND_OFFER",
+          "discount_type": "INSTANT",
+          "discount_pct": 10,
+          "discount_cap_paise": 100000,
+          "discount_paise": 100000,
+          "eligible": true,
+          "reason": "HDFC Bank 10% instant (max \u20b91000)"
+        },
+        {
+          "bank": "SBI Bank",
+          "offer_name": "Flat 5% Instant Discount",
+          "offer_id": "4100",
+          "tenure_id": "20",
+          "program_type": "BANK_OFFER",
+          "discount_type": "INSTANT",
+          "discount_pct": 5,
+          "discount_cap_paise": 50000,
+          "discount_paise": 0,
+          "eligible": false,
+          "reason": "Not eligible \u2014 card BIN 401200 not in SBI Bank bins"
+        },
+        {
+          "bank": "Axis Bank",
+          "offer_name": "15% Cashback (max Rs.750)",
+          "offer_id": "5200",
+          "tenure_id": "30",
+          "program_type": "BANK_OFFER",
+          "discount_type": "CASHBACK",
+          "discount_pct": 15,
+          "discount_cap_paise": 75000,
+          "discount_paise": 0,
+          "eligible": false,
+          "reason": "Not eligible \u2014 card BIN 401200 not in Axis Bank bins"
+        }
+      ],
+      "emi_options": [
+        {
+          "bank": "SBI Bank",
+          "offer_id": "4101",
+          "tenure_id": "21",
+          "tenure_months": 3,
+          "interest_rate": 12,
+          "monthly_paise": 341667,
+          "total_emi_paise": 1025000,
+          "extra_cost_paise": -17474700,
+          "no_cost": false,
+          "reason": "SBI Bank 3mo EMI @ 12% = \u20b93417/mo (extra \u20b9-174747)"
+        },
+        {
+          "bank": "HDFC Bank",
+          "offer_id": "3724",
+          "tenure_id": "9",
+          "tenure_months": 6,
+          "interest_rate": 14,
+          "monthly_paise": 173333,
+          "total_emi_paise": 1040000,
+          "extra_cost_paise": -17459700,
+          "no_cost": false,
+          "reason": "HDFC Bank 6mo EMI @ 14% = \u20b91733/mo (extra \u20b9-174597)"
+        },
+        {
+          "bank": "HDFC Bank",
+          "offer_id": "3723",
+          "tenure_id": "8",
+          "tenure_months": 3,
+          "interest_rate": 0,
+          "monthly_paise": 6166566,
+          "total_emi_paise": 18499700,
+          "extra_cost_paise": 0,
+          "no_cost": true,
+          "reason": "HDFC Bank 3mo No-Cost EMI @ \u20b961666/mo"
+        }
+      ],
+      "wallet": {
+        "use_wallet": true,
+        "wallet_code": "PHONEPE",
+        "wallet_amount_paise": 45000,
+        "card_amount_paise": 18454700,
+        "reason": "Use \u20b9450 from PHONEPE, card pays \u20b9184547"
+      },
+      "ranked_options": [
+        {
+          "type": "EMI",
+          "method": "CREDIT_EMI",
+          "bank": "SBI Bank",
+          "offer_id": "4101",
+          "tenure_id": "21",
+          "net_saving_paise": 17474700,
+          "effective_amount_paise": 1025000,
+          "monthly_paise": 341667,
+          "tenure_months": 3,
+          "interest_rate": 12,
+          "no_cost": false,
+          "eligible": true,
+          "reason": "SBI Bank 3mo EMI @ 12% = \u20b93417/mo (extra \u20b9-174747)"
+        },
+        {
+          "type": "EMI",
+          "method": "CREDIT_EMI",
+          "bank": "HDFC Bank",
+          "offer_id": "3724",
+          "tenure_id": "9",
+          "net_saving_paise": 17459700,
+          "effective_amount_paise": 1040000,
+          "monthly_paise": 173333,
+          "tenure_months": 6,
+          "interest_rate": 14,
+          "no_cost": false,
+          "eligible": true,
+          "reason": "HDFC Bank 6mo EMI @ 14% = \u20b91733/mo (extra \u20b9-174597)"
+        },
+        {
+          "type": "INSTANT_DISCOUNT",
+          "method": "CARD",
+          "bank": "HDFC Bank",
+          "offer_id": "3722",
+          "tenure_id": "7",
+          "net_saving_paise": 100000,
+          "effective_amount_paise": 18399700,
+          "eligible": true,
+          "reason": "HDFC Bank 10% instant (max \u20b91000)"
+        },
+        {
+          "type": "EMI",
+          "method": "CREDIT_EMI",
+          "bank": "HDFC Bank",
+          "offer_id": "3723",
+          "tenure_id": "8",
+          "net_saving_paise": 0,
+          "effective_amount_paise": 18499700,
+          "monthly_paise": 6166566,
+          "tenure_months": 3,
+          "interest_rate": 0,
+          "no_cost": true,
+          "eligible": true,
+          "reason": "HDFC Bank 3mo No-Cost EMI @ \u20b961666/mo"
+        },
+        {
+          "type": "INSTANT_DISCOUNT",
+          "method": "CARD",
+          "bank": "SBI Bank",
+          "offer_id": "4100",
+          "tenure_id": "20",
+          "net_saving_paise": 0,
+          "effective_amount_paise": 18499700,
+          "eligible": false,
+          "reason": "Not eligible \u2014 card BIN 401200 not in SBI Bank bins"
+        }
+      ],
+      "best_option": {
+        "type": "EMI",
+        "method": "CREDIT_EMI",
+        "bank": "SBI Bank",
+        "offer_id": "4101",
+        "tenure_id": "21",
+        "net_saving_paise": 17474700,
+        "effective_amount_paise": 1025000,
+        "monthly_paise": 341667,
+        "tenure_months": 3,
+        "interest_rate": 12,
+        "no_cost": false,
+        "eligible": true,
+        "reason": "SBI Bank 3mo EMI @ 12% = \u20b93417/mo (extra \u20b9-174747)"
+      },
+      "total_options_found": 6,
+      "mode_breakdown": [
+        {
+          "mode": "UPI",
+          "label": "UPI",
+          "available": true,
+          "best_offer_pct": 2.0,
+          "best_offer_label": "2% cashback",
+          "best_saving_paise": 369994,
+          "emi_detail": null
+        },
+        {
+          "mode": "CARD",
+          "label": "Credit/Debit Card",
+          "available": true,
+          "best_offer_pct": 10,
+          "best_offer_label": "10% off \u00b7 HDFC Bank",
+          "best_saving_paise": 100000,
+          "emi_detail": null
+        },
+        {
+          "mode": "NET_BANKING",
+          "label": "Net Banking",
+          "available": true,
+          "best_offer_pct": 5.0,
+          "best_offer_label": "5% off on net banking",
+          "best_saving_paise": 924985,
+          "emi_detail": null
+        },
+        {
+          "mode": "EMI",
+          "label": "EMI",
+          "available": true,
+          "best_offer_pct": 0.0,
+          "best_offer_label": "\u20b961666/mo \u00d7 3mo \u00b7 No extra cost",
+          "best_saving_paise": 0,
+          "emi_detail": {
+            "monthly_paise": 6166566,
+            "tenure_months": 3,
+            "total_paise": 18499700,
+            "extra_cost_paise": 0,
+            "no_cost": true,
+            "bank": "HDFC Bank"
+          }
+        },
+        {
+          "mode": "WALLET",
+          "label": "Wallet",
+          "available": true,
+          "best_offer_pct": 0.0,
+          "best_offer_label": "\u20b9650 available (partial + card)",
+          "best_saving_paise": 0,
+          "emi_detail": null
+        },
+        {
+          "mode": "BRAND_WALLET",
+          "label": "Brand Wallet",
+          "available": false,
+          "best_offer_pct": 0.0,
+          "best_offer_label": "Not configured for merchant",
+          "best_saving_paise": 0,
+          "emi_detail": null
+        },
+        {
+          "mode": "PAY_BY_POINTS",
+          "label": "Pay by Points",
+          "available": false,
+          "best_offer_pct": 0.0,
+          "best_offer_label": "No reward points linked",
+          "best_saving_paise": 0,
+          "emi_detail": null
+        },
+        {
+          "mode": "BANK_TRANSFER",
+          "label": "Bank Transfer",
+          "available": true,
+          "best_offer_pct": 0.0,
+          "best_offer_label": "No offers \u00b7 NEFT/RTGS",
+          "best_saving_paise": 0,
+          "emi_detail": null
+        },
+        {
+          "mode": "OTHERS",
+          "label": "Others",
+          "available": true,
+          "best_offer_pct": 0.0,
+          "best_offer_label": "BNPL, PayLater options",
+          "best_saving_paise": 0,
+          "emi_detail": null
+        }
+      ],
+      "saved_at": "2026-03-14T11:39:17.864804+00:00"
+    },
+    "a2507003-e920-46d9-8fff-205a6d7ceca4": {
+      "card": {
+        "card_bin": "401200",
+        "card_type": "CREDIT",
+        "bank": "HDFC Bank",
+        "network": "Visa",
+        "tier": "Platinum",
+        "base_reward_pct": 1.5,
+        "estimated_reward_paise": 119998
+      },
+      "offers": [
+        {
+          "bank": "HDFC Bank",
+          "offer_name": "No Cost EMI + Instant Cashback",
+          "offer_id": "3722",
+          "tenure_id": "7",
+          "program_type": "BRAND_OFFER",
+          "discount_type": "INSTANT",
+          "discount_pct": 10,
+          "discount_cap_paise": 100000,
+          "discount_paise": 100000,
+          "eligible": true,
+          "reason": "HDFC Bank 10% instant (max \u20b91000)"
+        },
+        {
+          "bank": "SBI Bank",
+          "offer_name": "Flat 5% Instant Discount",
+          "offer_id": "4100",
+          "tenure_id": "20",
+          "program_type": "BANK_OFFER",
+          "discount_type": "INSTANT",
+          "discount_pct": 5,
+          "discount_cap_paise": 50000,
+          "discount_paise": 0,
+          "eligible": false,
+          "reason": "Not eligible \u2014 card BIN 401200 not in SBI Bank bins"
+        },
+        {
+          "bank": "Axis Bank",
+          "offer_name": "15% Cashback (max Rs.750)",
+          "offer_id": "5200",
+          "tenure_id": "30",
+          "program_type": "BANK_OFFER",
+          "discount_type": "CASHBACK",
+          "discount_pct": 15,
+          "discount_cap_paise": 75000,
+          "discount_paise": 0,
+          "eligible": false,
+          "reason": "Not eligible \u2014 card BIN 401200 not in Axis Bank bins"
+        }
+      ],
+      "emi_options": [
+        {
+          "bank": "SBI Bank",
+          "offer_id": "4101",
+          "tenure_id": "21",
+          "tenure_months": 3,
+          "interest_rate": 12,
+          "monthly_paise": 341667,
+          "total_emi_paise": 1025000,
+          "extra_cost_paise": -6974900,
+          "no_cost": false,
+          "reason": "SBI Bank 3mo EMI @ 12% = \u20b93417/mo (extra \u20b9-69749)"
+        },
+        {
+          "bank": "HDFC Bank",
+          "offer_id": "3724",
+          "tenure_id": "9",
+          "tenure_months": 6,
+          "interest_rate": 14,
+          "monthly_paise": 173333,
+          "total_emi_paise": 1040000,
+          "extra_cost_paise": -6959900,
+          "no_cost": false,
+          "reason": "HDFC Bank 6mo EMI @ 14% = \u20b91733/mo (extra \u20b9-69599)"
+        },
+        {
+          "bank": "HDFC Bank",
+          "offer_id": "3723",
+          "tenure_id": "8",
+          "tenure_months": 3,
+          "interest_rate": 0,
+          "monthly_paise": 2666633,
+          "total_emi_paise": 7999900,
+          "extra_cost_paise": 0,
+          "no_cost": true,
+          "reason": "HDFC Bank 3mo No-Cost EMI @ \u20b926666/mo"
+        }
+      ],
+      "wallet": {
+        "use_wallet": true,
+        "wallet_code": "PHONEPE",
+        "wallet_amount_paise": 45000,
+        "card_amount_paise": 7954900,
+        "reason": "Use \u20b9450 from PHONEPE, card pays \u20b979549"
+      },
+      "ranked_options": [
+        {
+          "type": "EMI",
+          "method": "CREDIT_EMI",
+          "bank": "SBI Bank",
+          "offer_id": "4101",
+          "tenure_id": "21",
+          "net_saving_paise": 6974900,
+          "effective_amount_paise": 1025000,
+          "monthly_paise": 341667,
+          "tenure_months": 3,
+          "interest_rate": 12,
+          "no_cost": false,
+          "eligible": true,
+          "reason": "SBI Bank 3mo EMI @ 12% = \u20b93417/mo (extra \u20b9-69749)"
+        },
+        {
+          "type": "EMI",
+          "method": "CREDIT_EMI",
+          "bank": "HDFC Bank",
+          "offer_id": "3724",
+          "tenure_id": "9",
+          "net_saving_paise": 6959900,
+          "effective_amount_paise": 1040000,
+          "monthly_paise": 173333,
+          "tenure_months": 6,
+          "interest_rate": 14,
+          "no_cost": false,
+          "eligible": true,
+          "reason": "HDFC Bank 6mo EMI @ 14% = \u20b91733/mo (extra \u20b9-69599)"
+        },
+        {
+          "type": "INSTANT_DISCOUNT",
+          "method": "CARD",
+          "bank": "HDFC Bank",
+          "offer_id": "3722",
+          "tenure_id": "7",
+          "net_saving_paise": 100000,
+          "effective_amount_paise": 7899900,
+          "eligible": true,
+          "reason": "HDFC Bank 10% instant (max \u20b91000)"
+        },
+        {
+          "type": "EMI",
+          "method": "CREDIT_EMI",
+          "bank": "HDFC Bank",
+          "offer_id": "3723",
+          "tenure_id": "8",
+          "net_saving_paise": 0,
+          "effective_amount_paise": 7999900,
+          "monthly_paise": 2666633,
+          "tenure_months": 3,
+          "interest_rate": 0,
+          "no_cost": true,
+          "eligible": true,
+          "reason": "HDFC Bank 3mo No-Cost EMI @ \u20b926666/mo"
+        },
+        {
+          "type": "INSTANT_DISCOUNT",
+          "method": "CARD",
+          "bank": "SBI Bank",
+          "offer_id": "4100",
+          "tenure_id": "20",
+          "net_saving_paise": 0,
+          "effective_amount_paise": 7999900,
+          "eligible": false,
+          "reason": "Not eligible \u2014 card BIN 401200 not in SBI Bank bins"
+        }
+      ],
+      "best_option": {
+        "type": "EMI",
+        "method": "CREDIT_EMI",
+        "bank": "SBI Bank",
+        "offer_id": "4101",
+        "tenure_id": "21",
+        "net_saving_paise": 6974900,
+        "effective_amount_paise": 1025000,
+        "monthly_paise": 341667,
+        "tenure_months": 3,
+        "interest_rate": 12,
+        "no_cost": false,
+        "eligible": true,
+        "reason": "SBI Bank 3mo EMI @ 12% = \u20b93417/mo (extra \u20b9-69749)"
+      },
+      "total_options_found": 6,
+      "mode_breakdown": [
+        {
+          "mode": "UPI",
+          "label": "UPI",
+          "available": true,
+          "best_offer_pct": 2.0,
+          "best_offer_label": "2% cashback",
+          "best_saving_paise": 159998,
+          "emi_detail": null
+        },
+        {
+          "mode": "CARD",
+          "label": "Credit/Debit Card",
+          "available": true,
+          "best_offer_pct": 10,
+          "best_offer_label": "10% off \u00b7 HDFC Bank",
+          "best_saving_paise": 100000,
+          "emi_detail": null
+        },
+        {
+          "mode": "NET_BANKING",
+          "label": "Net Banking",
+          "available": true,
+          "best_offer_pct": 5.0,
+          "best_offer_label": "5% off on net banking",
+          "best_saving_paise": 399995,
+          "emi_detail": null
+        },
+        {
+          "mode": "EMI",
+          "label": "EMI",
+          "available": true,
+          "best_offer_pct": 0.0,
+          "best_offer_label": "\u20b926666/mo \u00d7 3mo \u00b7 No extra cost",
+          "best_saving_paise": 0,
+          "emi_detail": {
+            "monthly_paise": 2666633,
+            "tenure_months": 3,
+            "total_paise": 7999900,
+            "extra_cost_paise": 0,
+            "no_cost": true,
+            "bank": "HDFC Bank"
+          }
+        },
+        {
+          "mode": "WALLET",
+          "label": "Wallet",
+          "available": true,
+          "best_offer_pct": 0.0,
+          "best_offer_label": "\u20b9650 available (partial + card)",
+          "best_saving_paise": 0,
+          "emi_detail": null
+        },
+        {
+          "mode": "BRAND_WALLET",
+          "label": "Brand Wallet",
+          "available": false,
+          "best_offer_pct": 0.0,
+          "best_offer_label": "Not configured for merchant",
+          "best_saving_paise": 0,
+          "emi_detail": null
+        },
+        {
+          "mode": "PAY_BY_POINTS",
+          "label": "Pay by Points",
+          "available": false,
+          "best_offer_pct": 0.0,
+          "best_offer_label": "No reward points linked",
+          "best_saving_paise": 0,
+          "emi_detail": null
+        },
+        {
+          "mode": "BANK_TRANSFER",
+          "label": "Bank Transfer",
+          "available": true,
+          "best_offer_pct": 0.0,
+          "best_offer_label": "No offers \u00b7 NEFT/RTGS",
+          "best_saving_paise": 0,
+          "emi_detail": null
+        },
+        {
+          "mode": "OTHERS",
+          "label": "Others",
+          "available": true,
+          "best_offer_pct": 0.0,
+          "best_offer_label": "BNPL, PayLater options",
+          "best_saving_paise": 0,
+          "emi_detail": null
+        }
+      ],
+      "saved_at": "2026-03-14T11:42:11.048174+00:00"
     }
   },
   "abandonment_logs": [

@@ -23,15 +23,19 @@ const METHOD_LABELS = {
   NETBANKING: 'Net Banking',
 }
 
-export default function RecommendationCard({ recommendation, onApply, loading }) {
+export default function RecommendationCard({ recommendation, onApply, loading, totalPaise }) {
   const [showTrail, setShowTrail] = useState(false)
 
   if (!recommendation) return null
 
   const saving = recommendation.net_saving_paise / 100
-  const effective = recommendation.effective_amount_paise / 100
+  const originalTotal = (totalPaise || (recommendation.effective_amount_paise + recommendation.net_saving_paise)) / 100
+  // Guard against ₹0 display: effective should never be less than 0
+  const rawEffective = recommendation.effective_amount_paise / 100
+  const effective = Math.max(rawEffective, 0)
   const isEmi = ['CREDIT_EMI', 'DEBIT_EMI'].includes(recommendation.recommended_method)
   const emiDetail = recommendation.mode_breakdown?.find(m => m.mode === 'EMI')?.emi_detail
+  const isFreeAfterDiscount = effective === 0 && saving > 0
 
   return (
     <div style={{
@@ -89,11 +93,20 @@ export default function RecommendationCard({ recommendation, onApply, loading })
               </>
             ) : (
               <>
-                <p style={{ fontSize: 11, color: PL.muted, marginBottom: 3, fontWeight: 500 }}>You pay</p>
-                <p style={{ fontSize: 24, fontWeight: 900, color: PL.mint, lineHeight: 1 }}>₹{effective.toFixed(0)}</p>
+                <p style={{ fontSize: 11, color: PL.muted, marginBottom: 3, fontWeight: 500 }}>
+                  {isFreeAfterDiscount ? 'You pay now' : 'You pay'}
+                </p>
+                <p style={{ fontSize: 24, fontWeight: 900, color: PL.mint, lineHeight: 1 }}>
+                  ₹{effective.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                </p>
                 {saving > 0 && (
                   <p style={{ fontSize: 11, color: PL.muted, textDecoration: 'line-through', marginTop: 3 }}>
-                    ₹{((recommendation.effective_amount_paise + recommendation.net_saving_paise) / 100).toFixed(0)}
+                    ₹{originalTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </p>
+                )}
+                {isFreeAfterDiscount && (
+                  <p style={{ fontSize: 10, color: PL.teal, fontWeight: 700, marginTop: 3 }}>
+                    100% instant discount applied
                   </p>
                 )}
               </>
@@ -138,6 +151,53 @@ export default function RecommendationCard({ recommendation, onApply, loading })
           <p style={{ fontSize: 11, color: PL.muted, marginBottom: 16 }}>
             Also considered: {recommendation.alternatives.map(a => a.method || a).join(', ')}
           </p>
+        )}
+
+        {/* Per-mode cost breakdown — shows what you pay with each method */}
+        {recommendation.mode_breakdown?.filter(m => m.available && (m.best_saving_paise > 0 || m.emi_detail)).length > 0 && (
+          <div style={{
+            background: `${PL.green}04`, border: `1px solid ${PL.border}`,
+            borderRadius: 10, padding: '12px 14px', marginBottom: 16,
+          }}>
+            <p style={{ fontSize: 10, fontWeight: 700, color: PL.muted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Compare — what you pay per method
+            </p>
+            {recommendation.mode_breakdown.filter(m => m.available && (m.best_saving_paise > 0 || m.emi_detail)).map(mode => {
+              const isRec = mode.mode === recommendation.recommended_method ||
+                (['CREDIT_EMI', 'DEBIT_EMI'].includes(recommendation.recommended_method) && mode.mode === 'EMI')
+              const youPay = mode.you_pay_paise != null ? mode.you_pay_paise : (totalPaise || (recommendation.effective_amount_paise + recommendation.net_saving_paise)) - (mode.best_saving_paise || 0)
+              return (
+                <div key={mode.mode} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '6px 0', borderBottom: `1px solid ${PL.border}`,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {isRec && <span style={{ fontSize: 8, background: PL.mint, color: PL.green, padding: '1px 5px', borderRadius: 4, fontWeight: 800 }}>BEST</span>}
+                    <span style={{ fontSize: 11, fontWeight: isRec ? 700 : 500, color: PL.green }}>{mode.label}</span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    {mode.emi_detail ? (
+                      <span style={{ fontSize: 11, color: PL.green, fontWeight: 600 }}>
+                        ₹{(mode.emi_detail.monthly_paise / 100).toFixed(0)}/mo × {mode.emi_detail.tenure_months}
+                        <span style={{ fontSize: 9, color: PL.muted, marginLeft: 4 }}>
+                          (total ₹{(mode.emi_detail.total_paise / 100).toLocaleString('en-IN')})
+                        </span>
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: isRec ? PL.mint : PL.green }}>
+                        ₹{(youPay / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        {mode.best_saving_paise > 0 && (
+                          <span style={{ fontSize: 9, color: PL.teal, marginLeft: 4 }}>
+                            save ₹{(mode.best_saving_paise / 100).toFixed(0)}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         )}
 
         {/* Apply button */}
