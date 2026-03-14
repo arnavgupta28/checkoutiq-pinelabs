@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getStats, getSessions } from '../api/checkout'
 import { DiagnosisPanel, NudgePreview } from '../components/Abandonment/DiagnosisPanel'
 import { BarChart3 } from 'lucide-react'
@@ -22,17 +22,31 @@ export default function Dashboard() {
   const [sessions, setSessions] = useState([])
   const [selectedSession, setSelectedSession] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [backendDown, setBackendDown] = useState(false)
+  const consecutiveFailures = useRef(0)
 
   useEffect(() => {
     const loadData = async () => {
+      // Circuit breaker: stop hammering a dead backend
+      if (consecutiveFailures.current >= 3) return
+
       try {
         const [s, sess] = await Promise.all([getStats(), getSessions()])
         setStats(s)
         setSessions(sess.sessions || [])
+        consecutiveFailures.current = 0
+        setBackendDown(false)
       } catch (e) {
-        console.warn('Backend not reachable')
-        setStats({ total_sessions: 12, completed: 7, abandoned: 4, recovered: 2, abandonment_rate: 33.3, recovery_rate: 50 })
-        setSessions([])
+        consecutiveFailures.current += 1
+        if (consecutiveFailures.current === 1) {
+          // Use mock data on first failure so UI still renders
+          setStats({ total_sessions: 12, completed: 7, abandoned: 4, recovered: 2, abandonment_rate: 33.3, recovery_rate: 50 })
+          setSessions([])
+        }
+        if (consecutiveFailures.current >= 3) {
+          setBackendDown(true)
+          console.warn('[Dashboard] Backend unreachable — polling paused. Reload page to retry.')
+        }
       }
       setLoading(false)
     }
@@ -71,12 +85,13 @@ export default function Dashboard() {
         </div>
         <span style={{
           marginLeft: 'auto', fontSize: 10, fontWeight: 700,
-          background: `${PL.mint}18`, color: PL.green,
+          background: backendDown ? `${PL.yellow}18` : `${PL.mint}18`,
+          color: backendDown ? PL.yellow : PL.green,
           padding: '4px 12px', borderRadius: 20,
           display: 'flex', alignItems: 'center', gap: 5,
         }}>
-          <span style={{ width: 6, height: 6, background: PL.mint, borderRadius: '50%', display: 'inline-block' }} />
-          Live · auto-refresh 5s
+          <span style={{ width: 6, height: 6, background: backendDown ? PL.yellow : PL.mint, borderRadius: '50%', display: 'inline-block' }} />
+          {backendDown ? 'Backend offline · start uvicorn' : 'Live · auto-refresh 5s'}
         </span>
       </div>
 

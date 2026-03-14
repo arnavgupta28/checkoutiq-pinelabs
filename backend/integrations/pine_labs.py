@@ -75,6 +75,7 @@ class PineLabsClient:
         """
         token = await self._token_val()
         body = {
+            "merchant_id": settings.PINE_MERCHANT_ID,
             "merchant_order_reference": merchant_ref or str(uuid.uuid4()),
             "order_amount": {"value": amount_paise, "currency": "INR"},
             "pre_auth": False,

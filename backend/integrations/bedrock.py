@@ -11,31 +11,33 @@ CrewAI agents receive an `llm` object — both routes return something CrewAI ac
 """
 
 from backend.config import settings
-from langchain_core.language_models.chat_models import BaseChatModel
 
 
-def get_llm() -> BaseChatModel:
+def get_llm():
+    """Return a CrewAI-compatible LLM object (uses crewai.LLM / LiteLLM under the hood)."""
     if settings.LLM_PROVIDER == "bedrock":
         return _bedrock_llm()
     return _lmstudio_llm()
 
 
-def _lmstudio_llm() -> BaseChatModel:
+def _lmstudio_llm():
     """
     LM Studio exposes an OpenAI-compatible API at localhost:1234.
     Install: https://lmstudio.ai  → load any model → start local server.
+    
+    Uses crewai.LLM with 'openai/' prefix so LiteLLM routes it correctly.
     """
-    from langchain_openai import ChatOpenAI
-    return ChatOpenAI(
+    from crewai import LLM
+    return LLM(
+        model=f"openai/{settings.LM_STUDIO_MODEL}",   # LiteLLM needs provider prefix
         base_url=settings.LM_STUDIO_BASE_URL,
-        api_key="lm-studio",          # LM Studio ignores this but langchain requires it
-        model=settings.LM_STUDIO_MODEL,
+        api_key="lm-studio",                           # LM Studio ignores this value
         temperature=0.1,
-        max_tokens=1024,
+        max_tokens=512,                                # keep responses short to preserve context budget
     )
 
 
-def _bedrock_llm() -> BaseChatModel:
+def _bedrock_llm():
     """
     AWS Bedrock — Claude 3 Sonnet.
     Requires: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY in env (or IAM role).

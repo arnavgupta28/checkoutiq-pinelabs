@@ -16,7 +16,7 @@ from crewai import Agent, Task, Crew, Process
 from backend.integrations.bedrock import get_llm
 from backend.integrations.pine_labs import pine_labs
 from backend.models.checkout import PaymentRecommendation
-import json, logging
+import json, logging, asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -178,16 +178,26 @@ async def run_pipeline(
         logger.warning(f"Pine Labs offer-discovery failed ({e}), using mock")
         offers_data = await pine_labs.discover_offers_mock(card_bin, amount_paise)
 
+    # Trim offers to top 3 issuers with max 3 tenures each — keeps context within model limits
+    try:
+        issuers = offers_data.get("issuers", [])[:3]
+        for issuer in issuers:
+            if "tenures" in issuer:
+                issuer["tenures"] = issuer["tenures"][:3]
+        trimmed_offers = {"issuers": issuers}
+    except Exception:
+        trimmed_offers = offers_data
+
+    # Compact JSON (no indent) reduces token count by ~40%
     context = json.dumps({
         "session_id": session_id,
-        "order_id": order_id,
         "amount_paise": amount_paise,
         "amount_rupees": amount_paise / 100,
         "card_bin": card_bin,
         "card_type": card_type,
         "wallet_balances": wallet_balances,
-        "pine_labs_offers": offers_data,
-    }, indent=2)
+        "pine_labs_offers": trimmed_offers,
+    }, separators=(',', ':'))
 
     llm = get_llm()
 
@@ -232,18 +242,37 @@ async def run_pipeline(
         verbose=True,
     )
 
-    result = crew.kickoff()
+    # Run synchronous crew.kickoff() in a thread pool — keeps event loop unblocked
+    # and ensures CrewAI's verbose stdout output flushes to the uvicorn terminal
+    try:
+        result = await asyncio.to_thread(crew.kickoff)
+    except Exception as kickoff_err:
+        logger.error(f"[Layer1] crew.kickoff() failed: {kickoff_err}")
+        return {
+            "recommended_method": "CARD",
+            "offer_id": None,
+            "tenure_id": None,
+            "net_saving_paise": 0,
+            "effective_amount_paise": amount_paise,
+            "reason_trail": [f"Agent pipeline error: {kickoff_err}. Check LM Studio is running."],
+            "alternatives": [],
+        }
 
     # Parse result — CrewAI returns string, we expect JSON from decision_task
+    # qwen3 wraps output in <think>...</think> before the actual answer
     try:
         raw = str(result)
-        # Find JSON block in output
         import re
+        # Strip thinking block if present
+        raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
+        # Strip markdown code fences
+        raw = re.sub(r'```(?:json)?\s*|\s*```', '', raw).strip()
+        # Find outermost JSON object
         match = re.search(r'\{.*\}', raw, re.DOTALL)
         if match:
             return json.loads(match.group())
-    except Exception:
-        pass
+    except Exception as parse_err:
+        logger.warning(f"[Layer1] JSON parse error: {parse_err}")
 
     # Fallback if parsing fails
     return {

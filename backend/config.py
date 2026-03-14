@@ -4,6 +4,7 @@ class Settings(BaseSettings):
     # Pine Labs
     PINE_CLIENT_ID: str = "your_client_id_here"
     PINE_CLIENT_SECRET: str = "your_client_secret_here"
+    PINE_MERCHANT_ID: str = "your_merchant_id_here"
     PINE_ENV: str = "UAT"   # UAT | PRODUCTION
     PINE_CALLBACK_URL: str = "http://localhost:8000/webhooks/pine"
     PINE_FAILURE_CALLBACK_URL: str = "http://localhost:8000/webhooks/pine/failure"

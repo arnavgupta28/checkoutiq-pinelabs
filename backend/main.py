@@ -15,7 +15,15 @@ from backend.integrations.pine_labs import pine_labs
 from backend.agents.smart_checkout.pipeline import run_pipeline as run_smart_checkout
 from backend.agents.abandonment.pipeline import run_recovery_pipeline
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+    force=True,   # override any logging already configured by uvicorn/crewai
+)
+# Ensure CrewAI and LangChain loggers propagate to root so they appear in terminal
+logging.getLogger("crewai").setLevel(logging.DEBUG)
+logging.getLogger("langchain").setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="CheckoutIQ API", version="1.0.0")

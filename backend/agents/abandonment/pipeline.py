@@ -16,7 +16,7 @@ Agent execution:
 from crewai import Agent, Task, Crew, Process
 from backend.integrations.bedrock import get_llm
 from backend.integrations.pine_labs import pine_labs
-import json, logging
+import json, logging, asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,6 @@ async def run_recovery_pipeline(
 
     context = json.dumps({
         "session_id": session_id,
-        "order_id": order_id,
         "amount_paise": amount_paise,
         "amount_rupees": amount_paise / 100,
         "customer_name": f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip(),
@@ -57,7 +56,7 @@ async def run_recovery_pipeline(
         "failed_payment_method": failed_payment_method,
         "pine_error_code": error_code,
         "possible_causes": ABANDONMENT_CAUSES,
-    }, indent=2)
+    }, separators=(',', ':'))
 
     llm = get_llm()
 
@@ -141,15 +140,28 @@ ORIGINAL CONTEXT:
         verbose=True,
     )
 
-    crew_result = crew.kickoff()
+    # Run synchronous crew.kickoff() in a thread pool — keeps event loop unblocked
+    # and ensures CrewAI's verbose stdout output flushes to the uvicorn terminal
+    try:
+        crew_result = await asyncio.to_thread(crew.kickoff)
+    except Exception as kickoff_err:
+        logger.error(f"[Layer2] crew.kickoff() failed: {kickoff_err}")
+        crew_result = ""
 
     # Parse recovery output
+    # qwen3 wraps output in <think>...</think> before the actual answer
     try:
         import re
         raw = str(crew_result)
+        # Strip thinking block if present
+        raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
+        # Strip markdown code fences
+        raw = re.sub(r'```(?:json)?\s*|\s*```', '', raw).strip()
+        # Find outermost JSON object
         match = re.search(r'\{.*\}', raw, re.DOTALL)
         recovery_data = json.loads(match.group()) if match else {}
-    except Exception:
+    except Exception as parse_err:
+        logger.warning(f"[Layer2] JSON parse error: {parse_err}")
         recovery_data = {}
 
     nudge_msg = recovery_data.get("nudge_message", f"Complete your Rs.{amount_paise//100} order — quick checkout waiting!")
