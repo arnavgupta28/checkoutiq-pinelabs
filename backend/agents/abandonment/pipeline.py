@@ -149,19 +149,24 @@ ORIGINAL CONTEXT:
         crew_result = ""
 
     # Parse recovery output
-    # qwen3 wraps output in <think>...</think> before the actual answer
+    # CrewAI >=0.63 returns CrewOutput object; use .raw for the text
+    import re
     try:
-        import re
-        raw = str(crew_result)
-        # Strip thinking block if present
+        raw = crew_result.raw if hasattr(crew_result, 'raw') else str(crew_result)
+        logger.info(f"[Layer2] Raw crew output (first 500 chars): {raw[:500]}")
+        # Strip thinking block (<think>...</think>) — qwen3 thinking mode
         raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
         # Strip markdown code fences
         raw = re.sub(r'```(?:json)?\s*|\s*```', '', raw).strip()
         # Find outermost JSON object
         match = re.search(r'\{.*\}', raw, re.DOTALL)
         recovery_data = json.loads(match.group()) if match else {}
+        if recovery_data:
+            logger.info(f"[Layer2] Pipeline parsed OK — cause={recovery_data.get('primary_cause')}")
+        else:
+            logger.warning(f"[Layer2] No JSON found in output. Full raw: {raw[:1000]}")
     except Exception as parse_err:
-        logger.warning(f"[Layer2] JSON parse error: {parse_err}")
+        logger.warning(f"[Layer2] JSON parse error: {parse_err}. Raw: {raw[:500]}")
         recovery_data = {}
 
     nudge_msg = recovery_data.get("nudge_message", f"Complete your Rs.{amount_paise//100} order — quick checkout waiting!")

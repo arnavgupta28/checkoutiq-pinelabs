@@ -258,21 +258,25 @@ async def run_pipeline(
             "alternatives": [],
         }
 
-    # Parse result — CrewAI returns string, we expect JSON from decision_task
-    # qwen3 wraps output in <think>...</think> before the actual answer
+    # Parse result — CrewAI >=0.63 returns CrewOutput object; use .raw for the text
+    import re
     try:
-        raw = str(result)
-        import re
-        # Strip thinking block if present
+        raw = result.raw if hasattr(result, 'raw') else str(result)
+        logger.info(f"[Layer1] Raw crew output (first 500 chars): {raw[:500]}")
+        # Strip thinking block (<think>...</think>) — qwen3 thinking mode
         raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
         # Strip markdown code fences
         raw = re.sub(r'```(?:json)?\s*|\s*```', '', raw).strip()
         # Find outermost JSON object
         match = re.search(r'\{.*\}', raw, re.DOTALL)
         if match:
-            return json.loads(match.group())
+            parsed = json.loads(match.group())
+            logger.info(f"[Layer1] Pipeline parsed OK — method={parsed.get('recommended_method')} saving={parsed.get('net_saving_paise')}")
+            return parsed
+        else:
+            logger.warning(f"[Layer1] No JSON object found in output. Full raw: {raw[:1000]}")
     except Exception as parse_err:
-        logger.warning(f"[Layer1] JSON parse error: {parse_err}")
+        logger.warning(f"[Layer1] JSON parse error: {parse_err}. Raw: {raw[:500]}")
 
     # Fallback if parsing fails
     return {
