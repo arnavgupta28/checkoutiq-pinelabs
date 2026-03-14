@@ -110,7 +110,11 @@ async def start_session(req: StartSessionRequest):
 @app.post("/checkout/smart-apply")
 async def smart_apply(req: SmartApplyRequest, background_tasks: BackgroundTasks):
     """
-    Kick off Layer 1 CrewAI pipeline in background.
+    Kick off Layer 1 CrewAI pipeline with real-time status tracking.
+    Wave 1: 4 agents run in parallel (card, offer, emi, wallet)
+    Wave 2: conflict resolver (sequential)
+    Wave 3: decision agent (sequential)
+    
     Streams progress via WebSocket to session_id.
     Returns job_id immediately — frontend polls WS for completion.
     """
@@ -121,15 +125,15 @@ async def smart_apply(req: SmartApplyRequest, background_tasks: BackgroundTasks)
     job_id = str(uuid.uuid4())
     sessions[req.session_id]["status"] = "ANALYSING"
 
-    async def run_pipeline_task():
-        await ws_send(req.session_id, {"type": "agent_start", "agent": "card_agent"})
-        await asyncio.sleep(0.5)
-        await ws_send(req.session_id, {"type": "agent_start", "agent": "offer_agent"})
-        await asyncio.sleep(0.5)
-        await ws_send(req.session_id, {"type": "agent_start", "agent": "emi_agent"})
-        await asyncio.sleep(0.5)
-        await ws_send(req.session_id, {"type": "agent_start", "agent": "wallet_agent"})
+    async def status_callback(agent_name: str, status: str):
+        """Send agent status to WebSocket."""
+        await ws_send(req.session_id, {
+            "type": f"agent_{status}",  # "agent_running" or "agent_completed"
+            "agent": agent_name,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
 
+    async def run_pipeline_task():
         result = await run_smart_checkout(
             session_id=req.session_id,
             order_id=session["order_id"],
@@ -138,11 +142,14 @@ async def smart_apply(req: SmartApplyRequest, background_tasks: BackgroundTasks)
             card_type=req.card_type.value,
             wallet_balances=req.wallet_balances or {},
             use_mock=(settings.PINE_CLIENT_ID == "your_client_id_here"),
+            status_callback=status_callback,  # Pass callback for real-time updates
         )
 
-        await ws_send(req.session_id, {"type": "agent_complete", "agent": "conflict_resolver"})
-        await ws_send(req.session_id, {"type": "agent_complete", "agent": "decision_agent"})
-        await ws_send(req.session_id, {"type": "recommendation_ready", "data": result})
+        await ws_send(req.session_id, {
+            "type": "recommendation_ready",
+            "data": result,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
 
         sessions[req.session_id]["recommendation"] = result
         sessions[req.session_id]["status"] = "RECOMMENDATION_READY"
@@ -241,6 +248,14 @@ async def pine_webhook(request: Request, background_tasks: BackgroundTasks):
             session["status"] = "ABANDONED"
 
             async def trigger_recovery():
+                async def recovery_status_callback(agent_name: str, status: str):
+                    await ws_send(session["session_id"], {
+                        "type": f"agent_{status}",
+                        "agent": agent_name,
+                        "layer": "recovery",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    })
+
                 result = await run_recovery_pipeline(
                     session_id=session["session_id"],
                     order_id=order_id,
@@ -250,12 +265,16 @@ async def pine_webhook(request: Request, background_tasks: BackgroundTasks):
                     failed_payment_method=failed_method,
                     error_code=error_code,
                     use_mock=(settings.PINE_CLIENT_ID == "your_client_id_here"),
+                    status_callback=recovery_status_callback,
                 )
                 recovery_queue[order_id] = result
                 session["recovery"] = result
                 session["status"] = "RECOVERY_CRAFTED"
-                # Notify dashboard via WS
-                await ws_send(session["session_id"], {"type": "recovery_ready", "data": result})
+                await ws_send(session["session_id"], {
+                    "type": "recovery_ready",
+                    "data": result,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
 
             background_tasks.add_task(trigger_recovery)
 
@@ -264,11 +283,8 @@ async def pine_webhook(request: Request, background_tasks: BackgroundTasks):
 
 # ── RECOVERY — LAYER 2 ────────────────────────────────────────────────────────
 @app.post("/recovery/trigger")
-async def manual_recovery_trigger(
-    body: dict,
-    background_tasks: BackgroundTasks,
-):
-    """Manual trigger for demo — simulates abandonment event without real webhook."""
+async def manual_recovery_trigger(body: dict, background_tasks: BackgroundTasks):
+    """Manual recovery trigger for demo."""
     session_id = body.get("session_id")
     session = sessions.get(session_id)
     if not session:
@@ -281,11 +297,18 @@ async def manual_recovery_trigger(
         "scrolled_to_emi": True,
         "cart_value_vs_offer_gap_paise": 500,
         "retry_attempts": 0,
-        "last_action": "exited_without_payment",
     })
     session["abandonment_signals"] = behavioral_signals
 
     async def run():
+        async def recovery_status_callback(agent_name: str, status: str):
+            await ws_send(session_id, {
+                "type": f"agent_{status}",
+                "agent": agent_name,
+                "layer": "recovery",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+
         result = await run_recovery_pipeline(
             session_id=session_id,
             order_id=session["order_id"],
@@ -293,10 +316,15 @@ async def manual_recovery_trigger(
             customer=session["customer"],
             behavioral_signals=behavioral_signals,
             use_mock=(settings.PINE_CLIENT_ID == "your_client_id_here"),
+            status_callback=recovery_status_callback,
         )
         session["recovery"] = result
         session["status"] = "RECOVERY_CRAFTED"
-        await ws_send(session_id, {"type": "recovery_ready", "data": result})
+        await ws_send(session_id, {
+            "type": "recovery_ready",
+            "data": result,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
 
     background_tasks.add_task(run)
     return {"status": "recovery_triggered", "session_id": session_id}
@@ -315,17 +343,24 @@ async def get_recovery_nudge(session_id: str):
 
 @app.post("/recovery/{session_id}/redeliver")
 async def redeliver_recovery(session_id: str, background_tasks: BackgroundTasks):
-    """Re-trigger Layer 2 recovery pipeline for a session (e.g. with updated signals)."""
+    """Re-trigger Layer 2 recovery with status tracking."""
     session = sessions.get(session_id)
     if not session:
         raise HTTPException(404, "Session not found")
-    # Reset and re-run the pipeline with same signals
+
     session["status"] = "ABANDONED"
     session.pop("recovery", None)
-
     signals = session.get("abandonment_signals", {})
 
     async def run():
+        async def recovery_status_callback(agent_name: str, status: str):
+            await ws_send(session_id, {
+                "type": f"agent_{status}",
+                "agent": agent_name,
+                "layer": "recovery",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+
         result = await run_recovery_pipeline(
             session_id=session_id,
             order_id=session["order_id"],
@@ -335,10 +370,15 @@ async def redeliver_recovery(session_id: str, background_tasks: BackgroundTasks)
             failed_payment_method=signals.get("failed_method", ""),
             error_code=signals.get("error_code", ""),
             use_mock=(settings.PINE_CLIENT_ID == "your_client_id_here"),
+            status_callback=recovery_status_callback,
         )
         session["recovery"] = result
         session["status"] = "RECOVERY_CRAFTED"
-        await ws_send(session_id, {"type": "recovery_ready", "data": result})
+        await ws_send(session_id, {
+            "type": "recovery_ready",
+            "data": result,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
 
     background_tasks.add_task(run)
     return {"status": "redelivery_triggered", "session_id": session_id}

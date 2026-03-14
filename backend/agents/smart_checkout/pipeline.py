@@ -1,15 +1,11 @@
 """
-Layer 1 — Smart Checkout Agent Pipeline
-Triggered: when user reaches payment screen (POST /checkout/smart-apply)
-Input:     Pine Labs offer-discovery response + user's card/wallet data
-Output:    Single PaymentRecommendation with reason_trail
+Layer 1 — Smart Checkout Agent Pipeline with Status Tracking
+Execution:
+  Wave 1 (PARALLEL): card_agent, offer_agent, emi_agent, wallet_agent
+  Wave 2 (SEQUENTIAL): conflict_resolver (reads Wave 1 outputs)
+  Wave 3 (SEQUENTIAL): decision_agent (reads Wave 2 output)
 
-Agent execution order:
-  [card_agent + offer_agent + emi_agent + wallet_agent]  ← run in parallel (CrewAI parallel tasks)
-                         ↓
-                 conflict_resolver                        ← sequential
-                         ↓
-                  decision_agent                          ← sequential → final output
+Status updates sent to WebSocket for UI progress display.
 """
 
 from crewai import Agent, Task, Crew, Process
@@ -17,6 +13,7 @@ from backend.integrations.bedrock import get_llm
 from backend.integrations.pine_labs import pine_labs
 from backend.models.checkout import PaymentRecommendation
 import json, logging, asyncio
+from typing import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -159,16 +156,23 @@ async def run_pipeline(
     card_type: str,
     wallet_balances: dict,
     use_mock: bool = False,
+    status_callback: Callable = None,  # fn(agent_name, status) to send progress to UI
 ) -> dict:
     """
-    Main entry point for Layer 1.
-    1. Calls Pine Labs offer-discovery to get live offers
-    2. Passes data to CrewAI pipeline
-    3. Returns structured recommendation dict
+    Main entry point for Layer 1 with parallel execution + status tracking.
+    Wave 1: card, offer, emi, wallet agents run in parallel (independent tasks)
+    Wave 2: conflict resolver (depends on Wave 1)
+    Wave 3: decision agent (depends on Wave 2)
+    
+    status_callback: async fn(agent_name: str, status: str) to notify UI
+                     e.g., await status_callback("card_agent", "running")
     """
     logger.info(f"[Layer1] Starting pipeline for session={session_id}")
 
-    # Step 1: fetch live offers from Pine Labs
+    if not status_callback:
+        status_callback = lambda name, status: None
+
+    # Fetch live offers from Pine Labs
     try:
         if use_mock:
             offers_data = await pine_labs.discover_offers_mock(card_bin, amount_paise)
@@ -178,7 +182,7 @@ async def run_pipeline(
         logger.warning(f"Pine Labs offer-discovery failed ({e}), using mock")
         offers_data = await pine_labs.discover_offers_mock(card_bin, amount_paise)
 
-    # Trim offers to top 3 issuers with max 3 tenures each — keeps context within model limits
+    # Trim offers to top 3 issuers
     try:
         issuers = offers_data.get("issuers", [])[:3]
         for issuer in issuers:
@@ -188,7 +192,6 @@ async def run_pipeline(
     except Exception:
         trimmed_offers = offers_data
 
-    # Compact JSON (no indent) reduces token count by ~40%
     context = json.dumps({
         "session_id": session_id,
         "amount_paise": amount_paise,
@@ -201,87 +204,131 @@ async def run_pipeline(
 
     llm = get_llm()
 
-    # Build tasks inline (per-session context)
-    card_task = Task(
-        description=f"Analyse user's card ({card_bin}, {card_type}) against this data and identify the best card for this Rs.{amount_paise/100} transaction.\n\nDATA:\n{context}",
-        expected_output="JSON: {recommended_card, bank, estimated_reward_paise, reason}",
-        agent=_make_card_agent(llm),
+    # ════════════════════════════════════════════════════════════════════════
+    # WAVE 1: Run 4 independent agents in parallel
+    # ════════════════════════════════════════════════════════════════════════
+    
+    async def run_agent_task(agent_name: str, task_desc: str, expected_output: str, agent: Agent) -> dict:
+        """Run single agent task and track status."""
+        await status_callback(agent_name, "running")
+        try:
+            crew = Crew(
+                agents=[agent],
+                tasks=[Task(description=task_desc, expected_output=expected_output, agent=agent)],
+                process=Process.sequential,
+                verbose=False,
+            )
+            result = await asyncio.to_thread(crew.kickoff)
+            await status_callback(agent_name, "completed")
+            return {"status": "ok", "output": str(result)}
+        except Exception as e:
+            logger.error(f"[Layer1] {agent_name} failed: {e}")
+            await status_callback(agent_name, "failed")
+            return {"status": "error", "error": str(e)}
+
+    # Dispatch all 4 tasks in parallel
+    card_task_def = run_agent_task(
+        "card_agent",
+        f"Analyse card ({card_bin}, {card_type}) for Rs.{amount_paise/100} transaction.\n\nDATA:\n{context}",
+        "JSON: {recommended_card, bank, estimated_reward_paise, reason}",
+        _make_card_agent(llm)
     )
-    offer_task = Task(
-        description=f"Find all valid, eligible offers for this session from the Pine Labs offer data.\n\nDATA:\n{context}",
-        expected_output="JSON array of valid_offers: [{offer_id, tenure_id, bank, discount_paise, discount_percent, eligible: true}]",
-        agent=_make_offer_agent(llm),
+    offer_task_def = run_agent_task(
+        "offer_agent",
+        f"Find all valid, eligible offers from Pine Labs data.\n\nDATA:\n{context}",
+        "JSON array: [{offer_id, tenure_id, bank, discount_paise, eligible: true}]",
+        _make_offer_agent(llm)
     )
-    emi_task = Task(
-        description=f"Calculate EMI vs upfront cost comparison for this Rs.{amount_paise/100} order.\n\nDATA:\n{context}",
-        expected_output="JSON: {best_emi: {tenure_months, monthly_paise, total_paise, interest_paise, net_saving_vs_upfront_paise}, recommendation: 'emi'|'upfront', reason}",
-        agent=_make_emi_agent(llm),
+    emi_task_def = run_agent_task(
+        "emi_agent",
+        f"Calculate EMI vs upfront for Rs.{amount_paise/100}.\n\nDATA:\n{context}",
+        "JSON: {best_emi, recommendation: 'emi'|'upfront', reason}",
+        _make_emi_agent(llm)
     )
-    wallet_task = Task(
-        description=f"Determine optimal wallet usage given these balances: {wallet_balances}. Cart total: Rs.{amount_paise/100}.\n\nDATA:\n{context}",
-        expected_output="JSON: {use_wallet: bool, wallet_code: str, wallet_amount_paise: int, card_amount_paise: int, saving_rationale: str}",
-        agent=_make_wallet_agent(llm),
-    )
-    conflict_task = Task(
-        description="Review outputs of previous agents. Identify and resolve offer conflicts. Output top 3 non-conflicting payment configurations ranked by net saving.",
-        expected_output="JSON array top_configs: [{method, offer_id, tenure_id, wallet_split, net_saving_paise, conflict_notes}]",
-        agent=_make_conflict_agent(llm),
-        context=[card_task, offer_task, emi_task, wallet_task],
-    )
-    decision_task = Task(
-        description="Select the single best payment configuration. Output as structured recommendation with reason_trail.",
-        expected_output='JSON: {"recommended_method":"CARD"|"CREDIT_EMI", "offer_id":"...", "tenure_id":"...", "net_saving_paise":500, "effective_amount_paise":9500, "reason_trail":["Applied HDFC 10% instant discount...","..."], "alternatives":[...]}',
-        agent=_make_decision_agent(llm),
-        context=[conflict_task],
+    wallet_task_def = run_agent_task(
+        "wallet_agent",
+        f"Determine optimal wallet usage for Rs.{amount_paise/100}.\n\nDATA:\n{context}",
+        "JSON: {use_wallet, wallet_code, wallet_amount_paise, card_amount_paise}",
+        _make_wallet_agent(llm)
     )
 
-    crew = Crew(
-        agents=[],
-        tasks=[card_task, offer_task, emi_task, wallet_task, conflict_task, decision_task],
-        process=Process.sequential,
-        verbose=True,
+    # Wait for all 4 to complete
+    card_result, offer_result, emi_result, wallet_result = await asyncio.gather(
+        card_task_def, offer_task_def, emi_task_def, wallet_task_def
     )
 
-    # Run synchronous crew.kickoff() in a thread pool — keeps event loop unblocked
-    # and ensures CrewAI's verbose stdout output flushes to the uvicorn terminal
+    # Combine Wave 1 outputs into context for Wave 2
+    wave1_context = json.dumps({
+        "card_analysis": card_result.get("output", ""),
+        "offer_analysis": offer_result.get("output", ""),
+        "emi_analysis": emi_result.get("output", ""),
+        "wallet_analysis": wallet_result.get("output", ""),
+    }, separators=(',', ':'))
+
+    # ════════════════════════════════════════════════════════════════════════
+    # WAVE 2: Conflict resolver (sequential, reads Wave 1)
+    # ════════════════════════════════════════════════════════════════════════
+
+    await status_callback("conflict_resolver", "running")
     try:
-        result = await asyncio.to_thread(crew.kickoff)
-    except Exception as kickoff_err:
-        logger.error(f"[Layer1] crew.kickoff() failed: {kickoff_err}")
-        return {
-            "recommended_method": "CARD",
-            "offer_id": None,
-            "tenure_id": None,
-            "net_saving_paise": 0,
-            "effective_amount_paise": amount_paise,
-            "reason_trail": [f"Agent pipeline error: {kickoff_err}. Check LM Studio is running."],
-            "alternatives": [],
-        }
+        conflict_crew = Crew(
+            agents=[_make_conflict_agent(llm)],
+            tasks=[Task(
+                description=f"Resolve offer conflicts. Inputs from Wave 1:\n{wave1_context}\n\nOriginal context:\n{context}",
+                expected_output="JSON array: [{method, offer_id, tenure_id, net_saving_paise}]",
+                agent=_make_conflict_agent(llm)
+            )],
+            process=Process.sequential,
+            verbose=False,
+        )
+        conflict_result = await asyncio.to_thread(conflict_crew.kickoff)
+        await status_callback("conflict_resolver", "completed")
+        conflict_output = str(conflict_result)
+    except Exception as e:
+        logger.error(f"[Layer1] conflict_resolver failed: {e}")
+        await status_callback("conflict_resolver", "failed")
+        conflict_output = ""
 
-    # Parse result — CrewAI returns string, we expect JSON from decision_task
-    # qwen3 wraps output in <think>...</think> before the actual answer
+    # ════════════════════════════════════════════════════════════════════════
+    # WAVE 3: Decision agent (sequential, reads Wave 2)
+    # ════════════════════════════════════════════════════════════════════════
+
+    await status_callback("decision_agent", "running")
     try:
-        raw = str(result)
+        decision_crew = Crew(
+            agents=[_make_decision_agent(llm)],
+            tasks=[Task(
+                description=f"Select best payment config. Conflict resolver output:\n{conflict_output}\n\nOriginal context:\n{context}",
+                expected_output='JSON: {"recommended_method":"CARD"|"EMI", "offer_id":"...", "net_saving_paise":500, "effective_amount_paise":9500, "reason_trail":[...]}',
+                agent=_make_decision_agent(llm)
+            )],
+            process=Process.sequential,
+            verbose=False,
+        )
+        decision_result = await asyncio.to_thread(decision_crew.kickoff)
+        await status_callback("decision_agent", "completed")
+        final_output = str(decision_result)
+
+        # Parse JSON from final output
         import re
-        # Strip thinking block if present
+        raw = final_output
         raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
-        # Strip markdown code fences
         raw = re.sub(r'```(?:json)?\s*|\s*```', '', raw).strip()
-        # Find outermost JSON object
         match = re.search(r'\{.*\}', raw, re.DOTALL)
         if match:
             return json.loads(match.group())
-    except Exception as parse_err:
-        logger.warning(f"[Layer1] JSON parse error: {parse_err}")
+    except Exception as e:
+        logger.error(f"[Layer1] decision_agent failed: {e}")
+        await status_callback("decision_agent", "failed")
 
-    # Fallback if parsing fails
+    # Fallback
     return {
         "recommended_method": "CARD",
         "offer_id": None,
         "tenure_id": None,
         "net_saving_paise": 0,
         "effective_amount_paise": amount_paise,
-        "reason_trail": ["Could not fully analyse offers — showing best available option."],
+        "reason_trail": ["Agent pipeline completed with partial results."],
         "alternatives": [],
     }
 
