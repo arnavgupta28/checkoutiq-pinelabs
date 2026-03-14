@@ -137,9 +137,6 @@ export default function CheckoutPage() {
   const [selectedMode, setSelectedMode] = useState(null)
   const [manualRec, setManualRec] = useState(null)
 
-  // Use manual recommendation if set, otherwise use WS recommendation
-  const activeRecommendation = manualRec || recommendation
-
   const totalPaise = useMemo(
     () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [cart]
@@ -147,6 +144,10 @@ export default function CheckoutPage() {
   const totalRupees = totalPaise / 100
 
   const { agentStatus, recommendation, recovery, events, AGENTS, WAVE_1, WAVE_2, WAVE_3 } = useCheckoutWS(sessionId)
+
+  // Use manual recommendation if set, otherwise use WS recommendation
+  // MUST be defined AFTER useCheckoutWS so 'recommendation' is in scope
+  const activeRecommendation = manualRec || recommendation
 
   const addToCart = (product) => {
     setCart(prev => {
