@@ -38,14 +38,19 @@ export default function CheckoutPage() {
 
   const handleStartSession = async () => {
     setError(null)
+    const customer = {
+      first_name: 'Rahul', last_name: 'Sharma',
+      email_id: 'rahul@example.com', mobile_number: '9876543210',
+      country_code: '91',
+    }
     try {
       const res = await startSession({
         amount_paise: amount,
-        customer: {
-          first_name: 'Rahul', last_name: 'Sharma',
-          email_id: 'rahul@example.com', mobile_number: '9876543210',
-        },
+        customer,
       })
+      try {
+        localStorage.setItem('checkoutiq_customer', JSON.stringify(customer))
+      } catch (_) {}
       setSessionId(res.session_id)
       setPhase('paying')
     } catch (e) {
