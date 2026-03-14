@@ -1,0 +1,165 @@
+{
+  "issuers": [
+    {
+      "id": "6",
+      "name": "HDFC Bank",
+      "issuer_type": "CC_BANK",
+      "priority": 1,
+      "card_types": ["CREDIT"],
+      "card_bins": ["401200", "414720", "454365"],
+      "tenures": [
+        {
+          "tenure_id": "7",
+          "name": "No Cost EMI + Instant Cashback",
+          "tenure_type": "MONTH",
+          "tenure_value": 0,
+          "issuer_offer_parameters": [
+            { "program_type": "BRAND_OFFER", "offer_id": "3722", "offer_parameter_id": "204140" }
+          ],
+          "details": [
+            {
+              "interest_rate": 0,
+              "discount": {
+                "discount_type": "INSTANT",
+                "percentage": 10,
+                "amount": { "currency": "INR", "value": 100000 }
+              },
+              "monthly_emi_amount": { "currency": "INR", "value": 0 },
+              "total_emi_amount": { "currency": "INR", "value": 0 }
+            }
+          ]
+        },
+        {
+          "tenure_id": "8",
+          "name": "3 Month No Cost EMI",
+          "tenure_type": "MONTH",
+          "tenure_value": 3,
+          "issuer_offer_parameters": [
+            { "program_type": "BRAND_EMI", "offer_id": "3723", "offer_parameter_id": "204141" }
+          ],
+          "details": [
+            {
+              "interest_rate": 0,
+              "discount": {
+                "discount_type": "INSTANT",
+                "percentage": 0,
+                "amount": { "currency": "INR", "value": 0 }
+              },
+              "monthly_emi_amount": { "currency": "INR", "value": 333333 },
+              "total_emi_amount": { "currency": "INR", "value": 1000000 }
+            }
+          ]
+        },
+        {
+          "tenure_id": "9",
+          "name": "6 Month EMI @ 14% p.a.",
+          "tenure_type": "MONTH",
+          "tenure_value": 6,
+          "issuer_offer_parameters": [
+            { "program_type": "BRAND_EMI", "offer_id": "3724", "offer_parameter_id": "204142" }
+          ],
+          "details": [
+            {
+              "interest_rate": 14,
+              "discount": {
+                "discount_type": "INSTANT",
+                "percentage": 0,
+                "amount": { "currency": "INR", "value": 0 }
+              },
+              "monthly_emi_amount": { "currency": "INR", "value": 173333 },
+              "total_emi_amount": { "currency": "INR", "value": 1040000 }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "12",
+      "name": "SBI Bank",
+      "issuer_type": "CC_BANK",
+      "priority": 2,
+      "card_types": ["CREDIT"],
+      "card_bins": ["521234", "524094"],
+      "tenures": [
+        {
+          "tenure_id": "20",
+          "name": "Flat 5% Instant Discount",
+          "tenure_type": "MONTH",
+          "tenure_value": 0,
+          "issuer_offer_parameters": [
+            { "program_type": "BANK_OFFER", "offer_id": "4100", "offer_parameter_id": "210050" }
+          ],
+          "details": [
+            {
+              "interest_rate": 0,
+              "discount": {
+                "discount_type": "INSTANT",
+                "percentage": 5,
+                "amount": { "currency": "INR", "value": 50000 }
+              },
+              "monthly_emi_amount": { "currency": "INR", "value": 0 },
+              "total_emi_amount": { "currency": "INR", "value": 0 }
+            }
+          ]
+        },
+        {
+          "tenure_id": "21",
+          "name": "3 Month EMI @ 12% p.a.",
+          "tenure_type": "MONTH",
+          "tenure_value": 3,
+          "issuer_offer_parameters": [
+            { "program_type": "BRAND_EMI", "offer_id": "4101", "offer_parameter_id": "210051" }
+          ],
+          "details": [
+            {
+              "interest_rate": 12,
+              "discount": {
+                "discount_type": "INSTANT",
+                "percentage": 0,
+                "amount": { "currency": "INR", "value": 0 }
+              },
+              "monthly_emi_amount": { "currency": "INR", "value": 341667 },
+              "total_emi_amount": { "currency": "INR", "value": 1025000 }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "18",
+      "name": "Axis Bank",
+      "issuer_type": "CC_BANK",
+      "priority": 3,
+      "card_types": ["CREDIT", "DEBIT"],
+      "card_bins": ["421653", "462273"],
+      "tenures": [
+        {
+          "tenure_id": "30",
+          "name": "15% Cashback (max Rs.750)",
+          "tenure_type": "MONTH",
+          "tenure_value": 0,
+          "issuer_offer_parameters": [
+            { "program_type": "BANK_OFFER", "offer_id": "5200", "offer_parameter_id": "220060" }
+          ],
+          "details": [
+            {
+              "interest_rate": 0,
+              "discount": {
+                "discount_type": "CASHBACK",
+                "percentage": 15,
+                "amount": { "currency": "INR", "value": 75000 }
+              },
+              "monthly_emi_amount": { "currency": "INR", "value": 0 },
+              "total_emi_amount": { "currency": "INR", "value": 0 }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "_meta": {
+    "note": "Mock data — mirrors Pine Labs /api/affordability/v1/offer-discovery response shape",
+    "amounts_in_paise": true,
+    "min_order_paise": 200000
+  }
+}

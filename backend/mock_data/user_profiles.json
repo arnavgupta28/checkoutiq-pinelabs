@@ -1,0 +1,99 @@
+{
+  "users": [
+    {
+      "id": "user_001",
+      "name": "Rahul Sharma",
+      "email": "rahul@example.com",
+      "mobile": "9876543210",
+      "cards": [
+        {
+          "id": "HDFC_CC_4012",
+          "bank": "HDFC",
+          "network": "Visa",
+          "type": "CREDIT",
+          "bin": "401200",
+          "last4": "4242",
+          "reward_rate_pct": 2.0,
+          "category_bonus": { "electronics": 5.0, "groceries": 1.5 }
+        },
+        {
+          "id": "SBI_CC_5212",
+          "bank": "SBI",
+          "network": "Mastercard",
+          "type": "CREDIT",
+          "bin": "521234",
+          "last4": "8888",
+          "reward_rate_pct": 1.5,
+          "category_bonus": { "travel": 3.0, "dining": 2.0 }
+        }
+      ],
+      "wallets": [
+        { "code": "PHONEPE", "name": "PhonePe", "balance_paise": 45000 },
+        { "code": "PAYTM", "name": "Paytm", "balance_paise": 20000 }
+      ]
+    },
+    {
+      "id": "user_002",
+      "name": "Priya Patel",
+      "email": "priya@example.com",
+      "mobile": "9988776655",
+      "cards": [
+        {
+          "id": "AXIS_CC_4216",
+          "bank": "Axis",
+          "network": "Visa",
+          "type": "CREDIT",
+          "bin": "421653",
+          "last4": "1234",
+          "reward_rate_pct": 1.0,
+          "category_bonus": { "fashion": 5.0, "entertainment": 3.0 }
+        },
+        {
+          "id": "ICICI_DC_4567",
+          "bank": "ICICI",
+          "network": "Visa",
+          "type": "DEBIT",
+          "bin": "456700",
+          "last4": "5678",
+          "reward_rate_pct": 0.5,
+          "category_bonus": {}
+        }
+      ],
+      "wallets": [
+        { "code": "AMAZON_PAY", "name": "Amazon Pay", "balance_paise": 150000 },
+        { "code": "PHONEPE", "name": "PhonePe", "balance_paise": 8000 }
+      ]
+    },
+    {
+      "id": "user_003",
+      "name": "Arjun Mehta",
+      "email": "arjun@example.com",
+      "mobile": "8877665544",
+      "cards": [
+        {
+          "id": "KOTAK_CC_4567",
+          "bank": "Kotak",
+          "network": "Mastercard",
+          "type": "CREDIT",
+          "bin": "456780",
+          "last4": "9090",
+          "reward_rate_pct": 3.0,
+          "category_bonus": { "electronics": 4.0, "online": 2.5 }
+        },
+        {
+          "id": "HDFC_DC_6074",
+          "bank": "HDFC",
+          "network": "Rupay",
+          "type": "DEBIT",
+          "bin": "607400",
+          "last4": "3333",
+          "reward_rate_pct": 0.25,
+          "category_bonus": {}
+        }
+      ],
+      "wallets": [
+        { "code": "PAYTM", "name": "Paytm", "balance_paise": 75000 }
+      ]
+    }
+  ]
+}
