@@ -1,8 +1,18 @@
 """
-Layer 2 — Abandonment Recovery Pipeline (v2: with logging + fixed parsing)
-═══════════════════════════════════════════════════════════════════════════
-Sequential: diagnosis_agent → recovery_crafter → pay-by-link creation
-Each step logs to insights_db for merchant dashboard visibility.
+Layer 2 — Abandonment Recovery Pipeline (v3: InsightEngine-style 3-phase)
+══════════════════════════════════════════════════════════════════════════
+Architecture mirrors smart_checkout pipeline:
+  Phase 1 (INSTANT ~0ms):  Heuristic diagnosis — pure Python rule matching
+      - retry_attempts, error_code, scrolled_to_emi, time_on_screen, etc.
+      - Produces diagnosis_data immediately, no LLM needed
+  Phase 2 (LLM ~15s):     Single agent — recovery nudge crafter only
+      - Fed pre-computed diagnosis instead of raw signals
+      - One LLM call instead of two (diagnosis was free)
+  Phase 3 (FALLBACK):     Heuristic nudge if LLM fails/times out
+
+Performance: 50s (2 serial LLM calls) → ~15s (1 LLM call)
+Reliability: Phase 1 never fails, Phase 3 always fires as backstop
+Bug fix: agent=None on Tasks caused CrewAI AttributeError — fixed
 """
 
 from crewai import Agent, Task, Crew, Process
@@ -17,7 +27,7 @@ logger = logging.getLogger(__name__)
 ABANDONMENT_CAUSES = ["price_sensitivity", "payment_friction", "offer_confusion",
                        "emi_complexity", "trust_concern", "technical_error"]
 
-LLM_TIMEOUT_SECONDS = 25
+LLM_TIMEOUT_SECONDS = 30
 
 
 async def run_recovery_pipeline(
@@ -36,95 +46,74 @@ async def run_recovery_pipeline(
     if not status_callback:
         async def status_callback(name, status, **kwargs): pass
 
+    recovery_data = {}
+
+    # ════════════════════════════════════════════════════════════════════════
+    # PHASE 1: HEURISTIC DIAGNOSIS (instant, no LLM — replaces diagnosis_agent)
+    # ════════════════════════════════════════════════════════════════════════
+    await status_callback("diagnosis_agent", "running")
+
+    diagnosis_data = _heuristic_diagnosis(behavioral_signals, error_code)
+    logger.info(f"[Layer2] Phase1 diagnosis: {diagnosis_data['primary_cause']} "
+                f"(confidence={diagnosis_data['confidence']}) via heuristics")
+
+    await status_callback("diagnosis_agent", "completed")
+
+    # Log abandonment immediately — Phase 1 is reliable
+    await log_abandonment(
+        session_id=session_id,
+        cause=diagnosis_data["primary_cause"],
+        signals=behavioral_signals,
+        confidence=diagnosis_data["confidence"],
+        evidence=diagnosis_data["evidence"],
+    )
+
+    # ════════════════════════════════════════════════════════════════════════
+    # PHASE 2: LLM NUDGE CRAFTER (single agent, fed pre-computed diagnosis)
+    # ════════════════════════════════════════════════════════════════════════
+    await status_callback("recovery_crafter", "running")
+
     context = json.dumps({
         "session_id": session_id,
         "amount_rupees": amount_paise / 100,
         "customer_name": f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip(),
-        "behavioral_signals": behavioral_signals,
+        "diagnosis": diagnosis_data,
         "failed_payment_method": failed_payment_method,
-        "pine_error_code": error_code,
-        "possible_causes": ABANDONMENT_CAUSES,
     }, separators=(',', ':'))
 
-    llm = get_llm()
-    diagnosis_data = {}
-    recovery_data = {}
-
-    # ═══ STAGE 1: Diagnosis Agent ═══
-    await status_callback("diagnosis_agent", "running")
     try:
-        diagnosis_crew = Crew(
-            agents=[Agent(
-                role="Checkout Abandonment Diagnosis Expert",
-                goal="Determine primary reason user abandoned checkout from behavioral signals.",
-                backstory=(
-                    "Behavioural analyst for Indian e-commerce. "
-                    "145s on payment + scrolled_to_emi = price_sensitivity. "
-                    "retry_attempts > 1 + AUTH_FAILED = payment_friction. "
-                    "Output ONLY JSON."
-                ),
-                llm=llm, verbose=False,
-            )],
-            tasks=[Task(
-                description=f"Analyse signals, output one of: {ABANDONMENT_CAUSES}\nDATA: {context}",
-                expected_output='{"primary_cause":"...","confidence":0.85,"evidence":["..."]}',
-                agent=None,
-            )],
-            process=Process.sequential, verbose=False,
+        llm = get_llm()
+        nudge_agent = Agent(
+            role="Recovery Nudge Crafter",
+            goal="Write a short, personalised re-engagement message to bring the customer back.",
+            backstory=(
+                "Growth hacker specialising in Indian payment recovery. "
+                "Personalised messages convert 7× better than generic ones. "
+                "You receive a pre-computed diagnosis — just craft the nudge. "
+                "Output ONLY valid JSON, no extra text."
+            ),
+            llm=llm, verbose=False,
+        )
+        nudge_task = Task(
+            description=(
+                f"Diagnosis is already computed below — DO NOT re-diagnose. "
+                f"Craft a short recovery nudge (≤25 words) and recommend a payment method.\n\n"
+                f"CONTEXT: {context}"
+            ),
+            expected_output=(
+                '{"nudge_message":"...","discount_paise":0,'
+                '"suggested_method":"UPI|CARD|CREDIT_EMI","personalisation_notes":"..."}'
+            ),
+            agent=nudge_agent,
+        )
+        crew = Crew(
+            agents=[nudge_agent],
+            tasks=[nudge_task],
+            process=Process.sequential,
+            verbose=False,
         )
         result = await asyncio.wait_for(
-            asyncio.to_thread(diagnosis_crew.kickoff),
-            timeout=LLM_TIMEOUT_SECONDS,
-        )
-        await status_callback("diagnosis_agent", "completed")
-
-        raw = result.raw if hasattr(result, 'raw') else str(result)
-        raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
-        raw = re.sub(r'```(?:json)?\s*|\s*```', '', raw).strip()
-        match = re.search(r'\{.*\}', raw, re.DOTALL)
-        if match:
-            diagnosis_data = json.loads(match.group())
-            logger.info(f"[Layer2] Diagnosis: {diagnosis_data.get('primary_cause')} ({diagnosis_data.get('confidence')})")
-
-    except Exception as e:
-        logger.error(f"[Layer2] diagnosis_agent failed: {e}")
-        await status_callback("diagnosis_agent", "failed", error=str(e))
-        # Heuristic fallback diagnosis
-        diagnosis_data = _heuristic_diagnosis(behavioral_signals, error_code)
-        logger.info(f"[Layer2] Using heuristic diagnosis: {diagnosis_data.get('primary_cause')}")
-
-    # Log abandonment
-    await log_abandonment(
-        session_id=session_id,
-        cause=diagnosis_data.get("primary_cause", "unknown"),
-        signals=behavioral_signals,
-        confidence=diagnosis_data.get("confidence", 0),
-        evidence=diagnosis_data.get("evidence", []),
-    )
-
-    # ═══ STAGE 2: Recovery Crafter ═══
-    await status_callback("recovery_crafter", "running")
-    try:
-        recovery_crew = Crew(
-            agents=[Agent(
-                role="Recovery Strategy Crafter",
-                goal="Generate personalised re-engagement nudge from diagnosis.",
-                backstory=(
-                    "Growth hacker for Indian payment recovery. "
-                    "Personalised messages convert 7x better than generic ones. "
-                    "Output ONLY JSON."
-                ),
-                llm=llm, verbose=False,
-            )],
-            tasks=[Task(
-                description=f"Diagnosis: {json.dumps(diagnosis_data, separators=(',',':'))}\nContext: {context}\nGenerate recovery nudge.",
-                expected_output='{"nudge_message":"...","discount_paise":0,"suggested_method":"CREDIT_EMI","personalisation_notes":"..."}',
-                agent=None,
-            )],
-            process=Process.sequential, verbose=False,
-        )
-        result = await asyncio.wait_for(
-            asyncio.to_thread(recovery_crew.kickoff),
+            asyncio.to_thread(crew.kickoff),
             timeout=LLM_TIMEOUT_SECONDS,
         )
         await status_callback("recovery_crafter", "completed")
@@ -135,11 +124,18 @@ async def run_recovery_pipeline(
         match = re.search(r'\{.*\}', raw, re.DOTALL)
         if match:
             recovery_data = json.loads(match.group())
+            logger.info(f"[Layer2] LLM nudge: {recovery_data.get('nudge_message', '')[:60]}")
+        else:
+            logger.warning("[Layer2] No JSON in LLM nudge output — using heuristic")
+            recovery_data = _heuristic_nudge(diagnosis_data, amount_paise, customer)
 
+    except asyncio.TimeoutError:
+        logger.warning(f"[Layer2] Nudge LLM timed out after {LLM_TIMEOUT_SECONDS}s — using heuristic")
+        await status_callback("recovery_crafter", "completed")
+        recovery_data = _heuristic_nudge(diagnosis_data, amount_paise, customer)
     except Exception as e:
         logger.error(f"[Layer2] recovery_crafter failed: {e}")
         await status_callback("recovery_crafter", "failed", error=str(e))
-        # Heuristic fallback nudge
         recovery_data = _heuristic_nudge(diagnosis_data, amount_paise, customer)
 
     # ═══ Create Pine Labs pay-by-link ═══
