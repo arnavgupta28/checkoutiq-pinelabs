@@ -46,14 +46,21 @@ def _lmstudio_llm():
 
 def _bedrock_llm():
     """
-    AWS Bedrock — Claude 3 Sonnet.
-    Requires: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY in env (or IAM role).
+    AWS Bedrock — Claude via LiteLLM (crewai.LLM).
+    Uses temporary STS credentials loaded from .env.
+    Requires: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN in env.
     """
-    import boto3
-    from langchain_aws import ChatBedrock
-    client = boto3.client("bedrock-runtime", region_name=settings.BEDROCK_REGION)
-    return ChatBedrock(
-        client=client,
-        model_id=settings.BEDROCK_MODEL_ID,
-        model_kwargs={"max_tokens": 1024, "temperature": 0.1},
+    import os
+    from crewai import LLM
+
+    # Ensure boto3/LiteLLM picks up temporary credentials from settings
+    os.environ["AWS_ACCESS_KEY_ID"] = settings.AWS_ACCESS_KEY_ID
+    os.environ["AWS_SECRET_ACCESS_KEY"] = settings.AWS_SECRET_ACCESS_KEY
+    os.environ["AWS_SESSION_TOKEN"] = settings.AWS_SESSION_TOKEN
+    os.environ["AWS_DEFAULT_REGION"] = settings.BEDROCK_REGION
+
+    return LLM(
+        model=f"bedrock/{settings.BEDROCK_MODEL_ID}",
+        temperature=0.1,
+        max_tokens=1024,
     )

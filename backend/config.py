@@ -14,7 +14,13 @@ class Settings(BaseSettings):
     LM_STUDIO_BASE_URL: str = "http://localhost:1234/v1"
     LM_STUDIO_MODEL: str = "qwen3-8b"  # qwen/qwen3-8b in LM Studio — supports tool calling + thinking
     BEDROCK_REGION: str = "us-east-1"
-    BEDROCK_MODEL_ID: str = "anthropic.claude-3-sonnet-20240229-v1:0"
+    BEDROCK_MODEL_ID: str = "us.anthropic.claude-opus-4-6-v1"
+
+    # AWS credentials (used by boto3/LiteLLM for Bedrock)
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_SESSION_TOKEN: str = ""
+    AWS_DEFAULT_REGION: str = "us-east-1"
 
     # App
     SECRET_KEY: str = "changeme-for-prod"
