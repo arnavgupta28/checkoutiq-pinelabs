@@ -2,6 +2,9 @@
 
 Two-layer agentic checkout intelligence. Built for speed, resilience, and merchant observability.
 
+🚀 **Live Demo:** [checkoutiq-pinelabs.vercel.app](https://checkoutiq-pinelabs.vercel.app/login)  
+⚙️ **Backend API:** [100-53-193-229.sslip.io](https://100-53-193-229.sslip.io/docs)
+
 ---
 
 ## Architecture Overview
@@ -190,6 +193,8 @@ npm run dev
 ---
 
 ## Demo Flow
+
+> **Live:** https://checkoutiq-pinelabs.vercel.app/login
 
 1. Go to `/checkout` → add items to cart → Proceed to Payment
 2. Enter card BIN (`401200` = HDFC Platinum, `521234` = SBI SimplyCLICK, `421653` = Axis Flipkart)
