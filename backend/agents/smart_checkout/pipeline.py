@@ -184,10 +184,10 @@ async def run_pipeline(
 
     # Trim offers to top 3 issuers
     try:
-        issuers = offers_data.get("issuers", [])[:3]
+        issuers = offers_data.get("issuers", [])[:2]  # reduced from 3 to 2
         for issuer in issuers:
             if "tenures" in issuer:
-                issuer["tenures"] = issuer["tenures"][:3]
+                issuer["tenures"] = issuer["tenures"][:2]  # reduced from 3 to 2
         trimmed_offers = {"issuers": issuers}
     except Exception:
         trimmed_offers = offers_data
@@ -222,9 +222,11 @@ async def run_pipeline(
             await status_callback(agent_name, "completed")
             return {"status": "ok", "output": str(result)}
         except Exception as e:
-            logger.error(f"[Layer1] {agent_name} failed: {e}")
-            await status_callback(agent_name, "failed")
-            return {"status": "error", "error": str(e)}
+            import traceback
+            error_trace = traceback.format_exc()
+            logger.error(f"[Layer1] {agent_name} failed with trace:\n{error_trace}")
+            await status_callback(agent_name, "failed", error=str(e), trace=error_trace)
+            return {"status": "error", "error": str(e), "trace": error_trace}
 
     # Dispatch all 4 tasks in parallel
     card_task_def = run_agent_task(
@@ -257,6 +259,30 @@ async def run_pipeline(
         card_task_def, offer_task_def, emi_task_def, wallet_task_def
     )
 
+    # Check Wave 1 for failures
+    wave1_failures = []
+    if card_result.get("status") == "error":
+        wave1_failures.append({"agent": "card_agent", "error": card_result.get("error"), "trace": card_result.get("trace")})
+    if offer_result.get("status") == "error":
+        wave1_failures.append({"agent": "offer_agent", "error": offer_result.get("error"), "trace": offer_result.get("trace")})
+    if emi_result.get("status") == "error":
+        wave1_failures.append({"agent": "emi_agent", "error": emi_result.get("error"), "trace": emi_result.get("trace")})
+    if wallet_result.get("status") == "error":
+        wave1_failures.append({"agent": "wallet_agent", "error": wallet_result.get("error"), "trace": wallet_result.get("trace")})
+
+    if wave1_failures:
+        logger.error(f"[Layer1] Wave 1 had {len(wave1_failures)} failure(s): {json.dumps(wave1_failures, indent=2)}")
+        return {
+            "recommended_method": "FALLBACK",
+            "offer_id": None,
+            "tenure_id": None,
+            "net_saving_paise": 0,
+            "effective_amount_paise": amount_paise,
+            "reason_trail": ["One or more analysis agents failed. Please try again."],
+            "failures": wave1_failures,
+            "alternatives": [],
+        }
+
     # Combine Wave 1 outputs into context for Wave 2
     wave1_context = json.dumps({
         "card_analysis": card_result.get("output", ""),
@@ -270,6 +296,7 @@ async def run_pipeline(
     # ════════════════════════════════════════════════════════════════════════
 
     await status_callback("conflict_resolver", "running")
+    conflict_failed = False
     try:
         conflict_crew = Crew(
             agents=[_make_conflict_agent(llm)],
@@ -285,9 +312,24 @@ async def run_pipeline(
         await status_callback("conflict_resolver", "completed")
         conflict_output = str(conflict_result)
     except Exception as e:
-        logger.error(f"[Layer1] conflict_resolver failed: {e}")
-        await status_callback("conflict_resolver", "failed")
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.error(f"[Layer1] conflict_resolver failed:\n{error_trace}")
+        await status_callback("conflict_resolver", "failed", error=str(e), trace=error_trace)
+        conflict_failed = True
         conflict_output = ""
+
+    if conflict_failed:
+        return {
+            "recommended_method": "FALLBACK",
+            "offer_id": None,
+            "tenure_id": None,
+            "net_saving_paise": 0,
+            "effective_amount_paise": amount_paise,
+            "reason_trail": ["Conflict resolution failed. Please try again."],
+            "failures": [{"agent": "conflict_resolver", "error": "Wave 2 conflict resolution failed"}],
+            "alternatives": [],
+        }
 
     # ════════════════════════════════════════════════════════════════════════
     # WAVE 3: Decision agent (sequential, reads Wave 2)
@@ -318,8 +360,20 @@ async def run_pipeline(
         if match:
             return json.loads(match.group())
     except Exception as e:
-        logger.error(f"[Layer1] decision_agent failed: {e}")
-        await status_callback("decision_agent", "failed")
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.error(f"[Layer1] decision_agent failed:\n{error_trace}")
+        await status_callback("decision_agent", "failed", error=str(e), trace=error_trace)
+        return {
+            "recommended_method": "FALLBACK",
+            "offer_id": None,
+            "tenure_id": None,
+            "net_saving_paise": 0,
+            "effective_amount_paise": amount_paise,
+            "reason_trail": ["Decision synthesis failed. Please try again."],
+            "failures": [{"agent": "decision_agent", "error": str(e)}],
+            "alternatives": [],
+        }
 
     # Fallback
     return {

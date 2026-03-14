@@ -28,7 +28,7 @@ async def run_recovery_pipeline(
     failed_payment_method: str = "",
     error_code: str = "",
     use_mock: bool = False,
-    status_callback: Callable = None,  # fn(agent_name, status) to send progress to UI
+    status_callback: Callable = None,  # fn(agent_name, status, error, trace) to send progress to UI
 ) -> dict:
     """
     Layer 2 with sequential execution + status tracking.
@@ -90,8 +90,10 @@ DATA: {context}
         await status_callback("diagnosis_agent", "completed")
         diagnosis_output = str(diagnosis_result)
     except Exception as e:
-        logger.error(f"[Layer2] diagnosis_agent failed: {e}")
-        await status_callback("diagnosis_agent", "failed")
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.error(f"[Layer2] diagnosis_agent failed:\n{error_trace}")
+        await status_callback("diagnosis_agent", "failed", error=str(e), trace=error_trace)
         diagnosis_output = ""
 
     # ════════════════════════════════════════════════════════════════════════
@@ -130,8 +132,10 @@ Generate recovery strategy with nudge_message, discount, suggested_method.
         await status_callback("recovery_crafter", "completed")
         recovery_output = str(recovery_result)
     except Exception as e:
-        logger.error(f"[Layer2] recovery_crafter failed: {e}")
-        await status_callback("recovery_crafter", "failed")
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.error(f"[Layer2] recovery_crafter failed:\n{error_trace}")
+        await status_callback("recovery_crafter", "failed", error=str(e), trace=error_trace)
         recovery_output = ""
 
     # Parse both outputs

@@ -32,12 +32,24 @@ export function useCheckoutWS(sessionId) {
       }
       if (msg.type === 'agent_failed') {
         setAgentStatus(prev => ({ ...prev, [msg.agent]: 'failed' }))
+        // Log error for debugging
+        if (msg.error) {
+          console.error(`Agent ${msg.agent} failed:`, msg.error)
+          if (msg.trace) console.error('Trace:', msg.trace)
+        }
       }
       if (msg.type === 'recommendation_ready') {
-        // Mark all agents done
-        const allDone = {}
-        AGENTS.forEach(a => { allDone[a] = 'done' })
-        setAgentStatus(allDone)
+        // Only mark agents done if there are no failures
+        const recommendation = msg.data || {}
+        if (!recommendation.failures || recommendation.failures.length === 0) {
+          // Success: mark all agents done
+          const allDone = {}
+          AGENTS.forEach(a => { allDone[a] = 'done' })
+          setAgentStatus(allDone)
+        } else {
+          // Failure: keep individual failed states, don't overwrite
+          console.warn('Recommendation has failures:', recommendation.failures)
+        }
         setRecommendation(msg.data)
       }
       if (msg.type === 'recovery_ready') {

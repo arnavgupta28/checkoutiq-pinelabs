@@ -125,13 +125,19 @@ async def smart_apply(req: SmartApplyRequest, background_tasks: BackgroundTasks)
     job_id = str(uuid.uuid4())
     sessions[req.session_id]["status"] = "ANALYSING"
 
-    async def status_callback(agent_name: str, status: str):
-        """Send agent status to WebSocket."""
-        await ws_send(req.session_id, {
-            "type": f"agent_{status}",  # "agent_running" or "agent_completed"
+    async def status_callback(agent_name: str, status: str, error: str = None, trace: str = None):
+        """Send agent status to WebSocket with optional error details."""
+        msg = {
+            "type": f"agent_{status}",  # "agent_running", "agent_completed", or "agent_failed"
             "agent": agent_name,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        }
+        if error:
+            msg["error"] = error
+        if trace:
+            msg["trace"] = trace
+            logger.warning(f"Agent {agent_name} error trace:\n{trace}")
+        await ws_send(req.session_id, msg)
 
     async def run_pipeline_task():
         result = await run_smart_checkout(
