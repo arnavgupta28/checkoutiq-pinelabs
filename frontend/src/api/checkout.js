@@ -1,6 +1,8 @@
 import axios from 'axios'
 
-const api = axios.create({ baseURL: '' })
+// In dev: Vite proxy handles relative URLs → localhost:8000
+// In production (Vercel): VITE_API_URL=https://<ec2-ip-or-domain>
+const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || '' })
 
 export const startSession = (data) =>
   api.post('/checkout/session/start', data).then(r => r.data)

@@ -15,8 +15,17 @@ export function useCheckoutWS(sessionId) {
 
   useEffect(() => {
     if (!sessionId) return
-    const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const ws = new WebSocket(`${wsProto}://${window.location.host}/ws/checkout/${sessionId}`)
+    const apiUrl = import.meta.env.VITE_API_URL
+    let wsHost
+    if (apiUrl) {
+      // Production: point WS directly at backend server
+      wsHost = apiUrl.replace(/^https/, 'wss').replace(/^http/, 'ws')
+    } else {
+      // Dev: Vite proxy forwards /ws → localhost:8000
+      const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+      wsHost = `${wsProto}://${window.location.host}`
+    }
+    const ws = new WebSocket(`${wsHost}/ws/checkout/${sessionId}`)
     wsRef.current = ws
 
     ws.onmessage = (e) => {
