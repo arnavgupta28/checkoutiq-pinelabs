@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     # App
     SECRET_KEY: str = "changeme-for-prod"
     DEBUG: bool = True
+    ALLOWED_ORIGINS: str = ""   # Comma-separated extra origins e.g. https://xxx.vercel.app
 
     class Config:
         env_file = ".env"
