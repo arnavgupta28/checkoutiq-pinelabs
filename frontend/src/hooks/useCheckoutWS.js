@@ -7,7 +7,11 @@ export function useCheckoutWS(sessionId) {
   const [agentStatus, setAgentStatus] = useState({})
   const wsRef = useRef(null)
 
+  // Agent groups for UI organization
   const AGENTS = ['card_agent', 'offer_agent', 'emi_agent', 'wallet_agent', 'conflict_resolver', 'decision_agent']
+  const WAVE_1 = ['card_agent', 'offer_agent', 'emi_agent', 'wallet_agent']  // Parallel
+  const WAVE_2 = ['conflict_resolver']                                        // Sequential
+  const WAVE_3 = ['decision_agent']                                           // Sequential
 
   useEffect(() => {
     if (!sessionId) return
@@ -19,11 +23,15 @@ export function useCheckoutWS(sessionId) {
       const msg = JSON.parse(e.data)
       setEvents(prev => [...prev, msg])
 
-      if (msg.type === 'agent_start') {
+      // Map backend status to UI status
+      if (msg.type === 'agent_running') {
         setAgentStatus(prev => ({ ...prev, [msg.agent]: 'running' }))
       }
-      if (msg.type === 'agent_complete') {
+      if (msg.type === 'agent_completed') {
         setAgentStatus(prev => ({ ...prev, [msg.agent]: 'done' }))
+      }
+      if (msg.type === 'agent_failed') {
+        setAgentStatus(prev => ({ ...prev, [msg.agent]: 'failed' }))
       }
       if (msg.type === 'recommendation_ready') {
         // Mark all agents done
@@ -48,5 +56,15 @@ export function useCheckoutWS(sessionId) {
     }
   }, [])
 
-  return { events, recommendation, recovery, agentStatus, sendSignals, AGENTS }
+  return { 
+    events, 
+    recommendation, 
+    recovery, 
+    agentStatus, 
+    sendSignals, 
+    AGENTS,
+    WAVE_1,
+    WAVE_2,
+    WAVE_3,
+  }
 }
