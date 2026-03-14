@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
+import React from 'react'
 import { Link } from 'react-router-dom'
 import { User, Mail, Phone, Globe, Hash, ArrowLeft, Pencil, Check, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -57,6 +58,84 @@ const inputStyle = (PL) => ({
   outline: 'none',
   boxSizing: 'border-box',
 })
+
+function SavingsHistory() {
+  const [txns, setTxns] = React.useState([])
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem('checkoutiq_transactions')
+      if (raw) setTxns(JSON.parse(raw))
+    } catch (_) {}
+  }, [])
+
+  const totalSaved = txns.reduce((s, t) => s + (t.saving_paise || 0), 0)
+  const totalPaid = txns.reduce((s, t) => s + (t.paid_paise || 0), 0)
+
+  const METHOD_LABELS = {
+    CARD: 'Card', CREDIT_EMI: 'Card EMI', DEBIT_EMI: 'Debit EMI',
+    UPI: 'UPI', WALLET: 'Wallet', NETBANKING: 'Net Banking',
+  }
+
+  const cardStyle = {
+    background: PL.white, border: `1px solid ${PL.border}`,
+    borderRadius: 14, padding: 20, marginBottom: 12,
+    boxShadow: '0 2px 8px rgba(0,51,35,0.06)',
+  }
+
+  if (txns.length === 0) {
+    return (
+      <div style={{ ...cardStyle, textAlign: 'center', padding: '24px 20px' }}>
+        <p style={{ fontSize: 24, margin: '0 0 8px' }}>💰</p>
+        <p style={{ fontSize: 13, fontWeight: 700, color: PL.green, margin: '0 0 4px' }}>No transactions yet</p>
+        <p style={{ fontSize: 12, color: PL.muted, margin: 0 }}>Complete a checkout to see your savings here</p>
+      </div>
+    )
+  }
+
+  return (
+    <div style={cardStyle}>
+      <h3 style={{ fontSize: 13, fontWeight: 700, color: PL.green, margin: '0 0 14px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        💰 CheckoutIQ Savings
+      </h3>
+
+      {/* Summary stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+        <div style={{ background: `${PL.mint}12`, border: `1px solid ${PL.mint}30`, borderRadius: 10, padding: '12px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 900, color: PL.mint }}>₹{(totalSaved / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}</div>
+          <div style={{ fontSize: 10, color: PL.green, fontWeight: 600, marginTop: 2 }}>Total Saved</div>
+        </div>
+        <div style={{ background: `${PL.green}06`, border: `1px solid ${PL.border}`, borderRadius: 10, padding: '12px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 900, color: PL.green }}>{txns.length}</div>
+          <div style={{ fontSize: 10, color: PL.muted, fontWeight: 600, marginTop: 2 }}>Smart Checkouts</div>
+        </div>
+      </div>
+
+      {/* Transaction list */}
+      <p style={{ fontSize: 10, fontWeight: 700, color: PL.muted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Recent Transactions</p>
+      {txns.slice(0, 5).map((txn, i) => (
+        <div key={txn.id || i} style={{ padding: '9px 0', borderBottom: i < Math.min(txns.length, 5) - 1 ? `1px solid ${PL.border}` : 'none' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: PL.green, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {txn.cart_items?.map(i => i.image).join(' ') || '🛍️'} {txn.cart_items?.map(i => i.name).slice(0, 2).join(', ') || 'Order'}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                <span style={{ fontSize: 10, color: PL.muted }}>{new Date(txn.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                <span style={{ fontSize: 10, color: PL.muted }}>· {METHOD_LABELS[txn.payment_method] || txn.payment_method}</span>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: PL.green }}>₹{(txn.paid_paise / 100).toLocaleString('en-IN')}</div>
+              {txn.saving_paise > 0 && (
+                <div style={{ fontSize: 10, color: PL.teal, fontWeight: 700 }}>−₹{(txn.saving_paise / 100).toFixed(0)} saved</div>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function UserProfile() {
   const { user } = useAuth()
@@ -391,9 +470,11 @@ export default function UserProfile() {
         </div>
       )}
 
-      <p style={{ fontSize: 12, color: PL.muted, margin: 0 }}>
+      <p style={{ fontSize: 12, color: PL.muted, margin: '0 0 16px' }}>
         This data matches the backend <code style={{ background: `${PL.mint}20`, padding: '2px 6px', borderRadius: 4 }}>CustomerDetails</code> used for checkout sessions and recovery.
       </p>
+
+      <SavingsHistory />
     </div>
   )
 }

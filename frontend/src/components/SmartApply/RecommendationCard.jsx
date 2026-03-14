@@ -30,6 +30,8 @@ export default function RecommendationCard({ recommendation, onApply, loading })
 
   const saving = recommendation.net_saving_paise / 100
   const effective = recommendation.effective_amount_paise / 100
+  const isEmi = ['CREDIT_EMI', 'DEBIT_EMI'].includes(recommendation.recommended_method)
+  const emiDetail = recommendation.mode_breakdown?.find(m => m.mode === 'EMI')?.emi_detail
 
   return (
     <div style={{
@@ -72,12 +74,29 @@ export default function RecommendationCard({ recommendation, onApply, loading })
             )}
           </div>
           <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: 11, color: PL.muted, marginBottom: 3, fontWeight: 500 }}>You pay</p>
-            <p style={{ fontSize: 24, fontWeight: 900, color: PL.mint, lineHeight: 1 }}>₹{effective.toFixed(0)}</p>
-            {saving > 0 && (
-              <p style={{ fontSize: 11, color: PL.muted, textDecoration: 'line-through', marginTop: 3 }}>
-                ₹{((recommendation.effective_amount_paise + recommendation.net_saving_paise) / 100).toFixed(0)}
-              </p>
+            {isEmi && emiDetail ? (
+              <>
+                <p style={{ fontSize: 11, color: PL.muted, marginBottom: 2, fontWeight: 500 }}>Monthly payment</p>
+                <p style={{ fontSize: 20, fontWeight: 900, color: PL.mint, lineHeight: 1.1 }}>
+                  ₹{(emiDetail.monthly_paise / 100).toFixed(0)}<span style={{ fontSize: 12, fontWeight: 600 }}>/mo</span>
+                </p>
+                <p style={{ fontSize: 10, color: PL.muted, marginTop: 3 }}>
+                  × {emiDetail.tenure_months} months · Total ₹{(emiDetail.total_paise / 100).toLocaleString('en-IN')}
+                </p>
+                <p style={{ fontSize: 10, fontWeight: 700, marginTop: 2, color: emiDetail.no_cost ? PL.teal : PL.yellow }}>
+                  {emiDetail.no_cost ? '✓ No extra cost' : `+₹${(emiDetail.extra_cost_paise / 100).toFixed(0)} interest`}
+                </p>
+              </>
+            ) : (
+              <>
+                <p style={{ fontSize: 11, color: PL.muted, marginBottom: 3, fontWeight: 500 }}>You pay</p>
+                <p style={{ fontSize: 24, fontWeight: 900, color: PL.mint, lineHeight: 1 }}>₹{effective.toFixed(0)}</p>
+                {saving > 0 && (
+                  <p style={{ fontSize: 11, color: PL.muted, textDecoration: 'line-through', marginTop: 3 }}>
+                    ₹{((recommendation.effective_amount_paise + recommendation.net_saving_paise) / 100).toFixed(0)}
+                  </p>
+                )}
+              </>
             )}
           </div>
         </div>

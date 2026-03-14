@@ -1,10 +1,10 @@
 {
   "offer_popularity": {
     "3723": {
-      "chosen_count": 2,
+      "chosen_count": 4,
       "bank": "HDFC Bank",
-      "total_saving_paise": 34999400,
-      "last_chosen": "2026-03-14T10:19:41.448704+00:00"
+      "total_saving_paise": 76998800,
+      "last_chosen": "2026-03-14T11:11:02.610346+00:00"
     }
   },
   "session_insights": {
@@ -190,10 +190,275 @@
       },
       "total_options_found": 6,
       "saved_at": "2026-03-14T10:18:41.124381+00:00"
+    },
+    "38a51737-d5ab-4004-aff3-2d3014b3ca3a": {
+      "card": {
+        "card_bin": "401200",
+        "card_type": "CREDIT",
+        "bank": "HDFC Bank",
+        "network": "Visa",
+        "tier": "Platinum",
+        "base_reward_pct": 1.5,
+        "estimated_reward_paise": 329995
+      },
+      "offers": [
+        {
+          "bank": "HDFC Bank",
+          "offer_name": "No Cost EMI + Instant Cashback",
+          "offer_id": "3722",
+          "tenure_id": "7",
+          "program_type": "BRAND_OFFER",
+          "discount_type": "INSTANT",
+          "discount_pct": 10,
+          "discount_cap_paise": 100000,
+          "discount_paise": 100000,
+          "eligible": true,
+          "reason": "HDFC Bank 10% instant (max \u20b91000)"
+        },
+        {
+          "bank": "SBI Bank",
+          "offer_name": "Flat 5% Instant Discount",
+          "offer_id": "4100",
+          "tenure_id": "20",
+          "program_type": "BANK_OFFER",
+          "discount_type": "INSTANT",
+          "discount_pct": 5,
+          "discount_cap_paise": 50000,
+          "discount_paise": 0,
+          "eligible": false,
+          "reason": "Not eligible \u2014 card BIN 401200 not in SBI Bank bins"
+        },
+        {
+          "bank": "Axis Bank",
+          "offer_name": "15% Cashback (max Rs.750)",
+          "offer_id": "5200",
+          "tenure_id": "30",
+          "program_type": "BANK_OFFER",
+          "discount_type": "CASHBACK",
+          "discount_pct": 15,
+          "discount_cap_paise": 75000,
+          "discount_paise": 0,
+          "eligible": false,
+          "reason": "Not eligible \u2014 card BIN 401200 not in Axis Bank bins"
+        }
+      ],
+      "emi_options": [
+        {
+          "bank": "HDFC Bank",
+          "offer_id": "3723",
+          "tenure_id": "8",
+          "tenure_months": 3,
+          "interest_rate": 0,
+          "monthly_paise": 333333,
+          "total_emi_paise": 1000000,
+          "extra_cost_paise": -20999700,
+          "no_cost": true,
+          "reason": "HDFC Bank 3mo No-Cost EMI @ \u20b93333/mo"
+        },
+        {
+          "bank": "SBI Bank",
+          "offer_id": "4101",
+          "tenure_id": "21",
+          "tenure_months": 3,
+          "interest_rate": 12,
+          "monthly_paise": 341667,
+          "total_emi_paise": 1025000,
+          "extra_cost_paise": -20974700,
+          "no_cost": false,
+          "reason": "SBI Bank 3mo EMI @ 12% = \u20b93417/mo (extra \u20b9-209747)"
+        },
+        {
+          "bank": "HDFC Bank",
+          "offer_id": "3724",
+          "tenure_id": "9",
+          "tenure_months": 6,
+          "interest_rate": 14,
+          "monthly_paise": 173333,
+          "total_emi_paise": 1040000,
+          "extra_cost_paise": -20959700,
+          "no_cost": false,
+          "reason": "HDFC Bank 6mo EMI @ 14% = \u20b91733/mo (extra \u20b9-209597)"
+        }
+      ],
+      "wallet": {
+        "use_wallet": true,
+        "wallet_code": "PHONEPE",
+        "wallet_amount_paise": 45000,
+        "card_amount_paise": 21954700,
+        "reason": "Use \u20b9450 from PHONEPE, card pays \u20b9219547"
+      },
+      "ranked_options": [
+        {
+          "type": "EMI",
+          "method": "CREDIT_EMI",
+          "bank": "HDFC Bank",
+          "offer_id": "3723",
+          "tenure_id": "8",
+          "net_saving_paise": 20999700,
+          "effective_amount_paise": 1000000,
+          "monthly_paise": 333333,
+          "tenure_months": 3,
+          "interest_rate": 0,
+          "no_cost": true,
+          "eligible": true,
+          "reason": "HDFC Bank 3mo No-Cost EMI @ \u20b93333/mo"
+        },
+        {
+          "type": "EMI",
+          "method": "CREDIT_EMI",
+          "bank": "SBI Bank",
+          "offer_id": "4101",
+          "tenure_id": "21",
+          "net_saving_paise": 20974700,
+          "effective_amount_paise": 1025000,
+          "monthly_paise": 341667,
+          "tenure_months": 3,
+          "interest_rate": 12,
+          "no_cost": false,
+          "eligible": true,
+          "reason": "SBI Bank 3mo EMI @ 12% = \u20b93417/mo (extra \u20b9-209747)"
+        },
+        {
+          "type": "EMI",
+          "method": "CREDIT_EMI",
+          "bank": "HDFC Bank",
+          "offer_id": "3724",
+          "tenure_id": "9",
+          "net_saving_paise": 20959700,
+          "effective_amount_paise": 1040000,
+          "monthly_paise": 173333,
+          "tenure_months": 6,
+          "interest_rate": 14,
+          "no_cost": false,
+          "eligible": true,
+          "reason": "HDFC Bank 6mo EMI @ 14% = \u20b91733/mo (extra \u20b9-209597)"
+        },
+        {
+          "type": "INSTANT_DISCOUNT",
+          "method": "CARD",
+          "bank": "HDFC Bank",
+          "offer_id": "3722",
+          "tenure_id": "7",
+          "net_saving_paise": 100000,
+          "effective_amount_paise": 21899700,
+          "eligible": true,
+          "reason": "HDFC Bank 10% instant (max \u20b91000)"
+        },
+        {
+          "type": "INSTANT_DISCOUNT",
+          "method": "CARD",
+          "bank": "SBI Bank",
+          "offer_id": "4100",
+          "tenure_id": "20",
+          "net_saving_paise": 0,
+          "effective_amount_paise": 21999700,
+          "eligible": false,
+          "reason": "Not eligible \u2014 card BIN 401200 not in SBI Bank bins"
+        }
+      ],
+      "best_option": {
+        "type": "EMI",
+        "method": "CREDIT_EMI",
+        "bank": "HDFC Bank",
+        "offer_id": "3723",
+        "tenure_id": "8",
+        "net_saving_paise": 20999700,
+        "effective_amount_paise": 1000000,
+        "monthly_paise": 333333,
+        "tenure_months": 3,
+        "interest_rate": 0,
+        "no_cost": true,
+        "eligible": true,
+        "reason": "HDFC Bank 3mo No-Cost EMI @ \u20b93333/mo"
+      },
+      "total_options_found": 6,
+      "saved_at": "2026-03-14T11:09:32.019495+00:00"
     }
   },
-  "abandonment_logs": [],
-  "recovery_logs": [],
+  "abandonment_logs": [
+    {
+      "session_id": "test-session-001",
+      "timestamp": "2026-03-14T11:02:13.522186+00:00",
+      "cause": "price_sensitivity",
+      "confidence": 0.85,
+      "evidence": [
+        "scrolled_to_emi=true",
+        "time_on_screen=145s"
+      ],
+      "signals": {
+        "time_on_payment_screen_sec": 145,
+        "scrolled_to_emi": true,
+        "retry_attempts": 0,
+        "methods_hovered": [
+          "CARD"
+        ]
+      }
+    },
+    {
+      "session_id": "test-session-002",
+      "timestamp": "2026-03-14T11:02:48.845542+00:00",
+      "cause": "payment_friction",
+      "confidence": 0.9,
+      "evidence": [
+        "retry_attempts=3",
+        "error_code=USER_AUTHENTICATION_FAILED"
+      ],
+      "signals": {
+        "retry_attempts": 3,
+        "time_on_payment_screen_sec": 60
+      }
+    },
+    {
+      "session_id": "2fe769e7-fdd3-4ba9-af4d-38f6e53bf513",
+      "timestamp": "2026-03-14T11:11:16.996238+00:00",
+      "cause": "price_sensitivity",
+      "confidence": 0.85,
+      "evidence": [
+        "scrolled_to_emi=true",
+        "time_on_screen=145s"
+      ],
+      "signals": {
+        "time_on_payment_screen_sec": 145,
+        "methods_hovered": [
+          "CARD",
+          "UPI"
+        ],
+        "scrolled_to_emi": true,
+        "cart_value_vs_offer_gap_paise": 50000,
+        "retry_attempts": 1,
+        "last_action": "exited_at_otp"
+      }
+    }
+  ],
+  "recovery_logs": [
+    {
+      "session_id": "test-session-001",
+      "timestamp": "2026-03-14T11:02:20.596696+00:00",
+      "nudge_message": "Rahul, \u20b9499 ka tension nahi! Pay just \u20b9167/month with easy EMI. Complete your order now \ud83c\udf89",
+      "recovery_link": "https://pay.pine/mock/test-session-001",
+      "suggested_method": "CREDIT_EMI",
+      "discount_paise": 0,
+      "outcome": "sent"
+    },
+    {
+      "session_id": "test-session-002",
+      "timestamp": "2026-03-14T11:02:54.571323+00:00",
+      "nudge_message": "Hi Priya! We noticed a login hiccup. Try again with UPI \u2014 no authentication hassle, just \u20b9899 in one tap! \ud83d\udc9a",
+      "recovery_link": "https://pay.pine/mock/test-session-002",
+      "suggested_method": "UPI",
+      "discount_paise": 0,
+      "outcome": "sent"
+    },
+    {
+      "session_id": "2fe769e7-fdd3-4ba9-af4d-38f6e53bf513",
+      "timestamp": "2026-03-14T11:11:26.121788+00:00",
+      "nudge_message": "Rahul, \u20b92,19,997 becomes just \u20b918,333/mo with no-cost EMI! Complete your purchase today \u2014 easy on your wallet.",
+      "recovery_link": null,
+      "suggested_method": "CREDIT_EMI",
+      "discount_paise": 0,
+      "outcome": "sent"
+    }
+  ],
   "recovery_rules": [
     {
       "rule_id": "R1",

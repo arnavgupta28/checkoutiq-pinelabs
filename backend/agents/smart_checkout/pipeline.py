@@ -169,6 +169,7 @@ async def run_pipeline(
                 insights["card"].get("bank", ""),
                 parsed.get("net_saving_paise", 0),
             )
+            parsed["mode_breakdown"] = insights.get("mode_breakdown", [])
             return parsed
         else:
             logger.warning(f"[Layer1] No JSON in LLM output, using fallback")
@@ -193,4 +194,5 @@ async def run_pipeline(
         insights["card"].get("bank", ""),
         fallback.get("net_saving_paise", 0),
     )
+    fallback["mode_breakdown"] = insights.get("mode_breakdown", [])
     return fallback

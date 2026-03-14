@@ -78,6 +78,13 @@ def run_insight_engine(
     # Sort by net_saving descending, then eligible first
     all_options.sort(key=lambda x: (-int(x["eligible"]), -x["net_saving_paise"]))
 
+    mode_breakdown = _compute_mode_breakdown(
+        amount_paise=amount_paise,
+        wallet_balances=wallet_balances or {},
+        offer_insights=offer_insights,
+        emi_insights=emi_insights,
+    )
+
     bundle = {
         "card": card_insight,
         "offers": offer_insights,
@@ -86,6 +93,7 @@ def run_insight_engine(
         "ranked_options": all_options[:5],  # Top 5 for LLM to reason about
         "best_option": all_options[0] if all_options else None,
         "total_options_found": len(all_options),
+        "mode_breakdown": mode_breakdown,
     }
 
     logger.info(f"[InsightEngine] Done: {len(offer_insights)} offers, {len(emi_insights)} EMI options, "
@@ -193,18 +201,20 @@ def _analyse_emi(offers_data: dict, amount_paise: int) -> list:
                 total = detail.get("total_emi_amount", {}).get("value", 0)
                 no_cost = interest == 0
 
-                if monthly == 0:
-                    # Calculate from amount + interest
-                    if no_cost:
-                        monthly = amount_paise // months
-                        total = amount_paise
-                    else:
+                # For no-cost EMI always recompute from actual amount
+                # (mock / catalogue data may contain values for a different order amount)
+                if no_cost:
+                    monthly = amount_paise // months
+                    total = amount_paise
+                    extra_cost = 0
+                else:
+                    if monthly == 0:
                         r = interest / 12 / 100
                         monthly = int(amount_paise * r * (1 + r)**months / ((1 + r)**months - 1))
                         total = monthly * months
+                    extra_cost = total - amount_paise
 
                 offer_params = tenure.get("issuer_offer_parameters", [{}])[0]
-                extra_cost = total - amount_paise
 
                 results.append({
                     "bank": bank_name,
@@ -257,3 +267,120 @@ def _analyse_wallet(wallet_balances: dict, amount_paise: int, offers: list) -> d
             }
 
     return best_wallet or {"use_wallet": False, "reason": "Wallet balances too low to be useful"}
+
+
+# ── All-mode breakdown (shown in payment methods grid) ───────────────────────
+
+def _compute_mode_breakdown(
+    amount_paise: int,
+    wallet_balances: dict,
+    offer_insights: list,
+    emi_insights: list,
+) -> list:
+    """
+    Compute best available offer per Pine Labs payment mode.
+    Returns 9 modes in Pine Labs display order.
+    UPI / NetBanking offers are representative of typical Pine Labs partner cashbacks.
+    EMI is shown as monthly amount — never as '0 downpayment' (ethically transparent).
+    """
+    modes = []
+
+    # ── UPI — Pine Labs UPI typically carries ~2% merchant-funded cashback ──────
+    upi_saving = int(amount_paise * 0.02)
+    modes.append({
+        "mode": "UPI", "label": "UPI", "available": True,
+        "best_offer_pct": 2.0, "best_offer_label": "2% cashback",
+        "best_saving_paise": upi_saving, "emi_detail": None,
+    })
+
+    # ── Credit / Debit Card — from actual offer discovery ─────────────────────
+    eligible = [o for o in offer_insights if o.get("eligible") and o["discount_paise"] > 0]
+    if eligible:
+        best = max(eligible, key=lambda x: x["discount_paise"])
+        modes.append({
+            "mode": "CARD", "label": "Credit/Debit Card", "available": True,
+            "best_offer_pct": best["discount_pct"],
+            "best_offer_label": f"{best['discount_pct']}% off · {best['bank']}",
+            "best_saving_paise": best["discount_paise"], "emi_detail": None,
+        })
+    else:
+        modes.append({
+            "mode": "CARD", "label": "Credit/Debit Card", "available": True,
+            "best_offer_pct": 0.0, "best_offer_label": "No offers for your card",
+            "best_saving_paise": 0, "emi_detail": None,
+        })
+
+    # ── Net Banking — 5% off (standard Pine Labs NB partner offer) ────────────
+    modes.append({
+        "mode": "NET_BANKING", "label": "Net Banking", "available": True,
+        "best_offer_pct": 5.0, "best_offer_label": "5% off on net banking",
+        "best_saving_paise": int(amount_paise * 0.05), "emi_detail": None,
+    })
+
+    # ── EMI — always shown as monthly amount, never as "0 downpayment" ─────────
+    if emi_insights:
+        no_cost_emis = [e for e in emi_insights if e["no_cost"]]
+        best_emi = min(no_cost_emis or emi_insights, key=lambda x: x["tenure_months"])
+        monthly = best_emi["monthly_paise"]
+        months = best_emi["tenure_months"]
+        total = best_emi["total_emi_paise"]
+        extra = best_emi["extra_cost_paise"]
+        no_cost = best_emi["no_cost"]
+        label = f"₹{monthly/100:.0f}/mo × {months}mo · {'No extra cost' if no_cost else f'₹{extra/100:.0f} extra'}"
+        modes.append({
+            "mode": "EMI", "label": "EMI", "available": True,
+            "best_offer_pct": 0.0, "best_offer_label": label,
+            "best_saving_paise": 0,
+            "emi_detail": {
+                "monthly_paise": monthly, "tenure_months": months,
+                "total_paise": total, "extra_cost_paise": extra,
+                "no_cost": no_cost, "bank": best_emi["bank"],
+            },
+        })
+    else:
+        avail = amount_paise >= 300000
+        modes.append({
+            "mode": "EMI", "label": "EMI", "available": avail,
+            "best_offer_pct": 0.0,
+            "best_offer_label": "Min order ₹3,000 required" if not avail else "No EMI offers",
+            "best_saving_paise": 0, "emi_detail": None,
+        })
+
+    # ── Wallet — from user's actual wallet balances ───────────────────────────
+    total_wallet = sum(v for v in wallet_balances.values() if v > 0)
+    if total_wallet >= amount_paise:
+        modes.append({
+            "mode": "WALLET", "label": "Wallet", "available": True,
+            "best_offer_pct": 5.0,
+            "best_offer_label": f"5% cashback · ₹{total_wallet/100:.0f} available",
+            "best_saving_paise": int(amount_paise * 0.05), "emi_detail": None,
+        })
+    elif total_wallet > 0:
+        modes.append({
+            "mode": "WALLET", "label": "Wallet", "available": True,
+            "best_offer_pct": 0.0,
+            "best_offer_label": f"₹{total_wallet/100:.0f} available (partial + card)",
+            "best_saving_paise": 0, "emi_detail": None,
+        })
+    else:
+        modes.append({
+            "mode": "WALLET", "label": "Wallet", "available": False,
+            "best_offer_pct": 0.0, "best_offer_label": "No wallet balance",
+            "best_saving_paise": 0, "emi_detail": None,
+        })
+
+    # ── Brand Wallet, Pay by Points, Bank Transfer, Others ───────────────────
+    modes.append({"mode": "BRAND_WALLET", "label": "Brand Wallet", "available": False,
+                  "best_offer_pct": 0.0, "best_offer_label": "Not configured for merchant",
+                  "best_saving_paise": 0, "emi_detail": None})
+    modes.append({"mode": "PAY_BY_POINTS", "label": "Pay by Points", "available": False,
+                  "best_offer_pct": 0.0, "best_offer_label": "No reward points linked",
+                  "best_saving_paise": 0, "emi_detail": None})
+    modes.append({"mode": "BANK_TRANSFER", "label": "Bank Transfer", "available": True,
+                  "best_offer_pct": 0.0, "best_offer_label": "No offers · NEFT/RTGS",
+                  "best_saving_paise": 0, "emi_detail": None})
+    modes.append({"mode": "OTHERS", "label": "Others", "available": True,
+                  "best_offer_pct": 0.0, "best_offer_label": "BNPL, PayLater options",
+                  "best_saving_paise": 0, "emi_detail": None})
+
+    return modes

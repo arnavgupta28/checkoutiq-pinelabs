@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { startSession, triggerSmartApply, recordOfferChosen } from '../api/checkout'
 import { triggerRecovery } from '../api/recovery'
 import { useCheckoutWS } from '../hooks/useCheckoutWS'
@@ -37,6 +38,64 @@ function parseName(fullName) {
   return { first_name: parts[0] || '', last_name: parts.slice(1).join(' ') || '' }
 }
 
+const METHOD_LABELS = {
+  CARD: 'Credit / Debit Card', CREDIT_EMI: 'Credit Card EMI', DEBIT_EMI: 'Debit Card EMI',
+  UPI: 'UPI', WALLET: 'Wallet', NETBANKING: 'Net Banking',
+}
+
+const MODE_ICONS = {
+  UPI: '📲', CARD: '💳', NET_BANKING: '🏦', EMI: '📅',
+  WALLET: '👛', BRAND_WALLET: '🏪', PAY_BY_POINTS: '⭐',
+  BANK_TRANSFER: '🏛️', OTHERS: '➕',
+}
+
+function PaymentModesGrid({ modes, recommended }) {
+  if (!modes?.length) return null
+  const bestSaving = Math.max(...modes.filter(m => m.available).map(m => m.best_saving_paise || 0))
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <p style={{ fontSize: 11, fontWeight: 700, color: PL.muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        Payment Methods — Offers &amp; Availability
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+        {modes.map(mode => {
+          const isRecommended = recommended && (
+            mode.mode === recommended ||
+            (recommended === 'CREDIT_EMI' && mode.mode === 'EMI') ||
+            (recommended === 'DEBIT_EMI' && mode.mode === 'EMI')
+          )
+          const isAlt = !isRecommended && mode.available && mode.best_saving_paise > 0 && mode.best_saving_paise === bestSaving && bestSaving > 0
+          const isNA = !mode.available
+          return (
+            <div key={mode.mode} style={{
+              borderRadius: 10, padding: '10px 8px',
+              border: `1.5px solid ${isRecommended ? PL.mint : PL.border}`,
+              background: isRecommended ? `${PL.mint}15` : isNA ? `${PL.green}03` : PL.white,
+              opacity: isNA ? 0.5 : 1,
+              position: 'relative', overflow: 'hidden',
+            }}>
+              {isRecommended && (
+                <div style={{ position: 'absolute', top: 0, right: 0, background: PL.mint, color: PL.green, fontSize: 8, fontWeight: 800, padding: '2px 6px', borderBottomLeftRadius: 6 }}>BEST</div>
+              )}
+              {isAlt && (
+                <div style={{ position: 'absolute', top: 0, right: 0, background: PL.yellow, color: '#fff', fontSize: 8, fontWeight: 800, padding: '2px 6px', borderBottomLeftRadius: 6 }}>ALT</div>
+              )}
+              <div style={{ fontSize: 18, marginBottom: 3 }}>{MODE_ICONS[mode.mode] || '💳'}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: PL.green, marginBottom: 2, lineHeight: 1.2 }}>{mode.label}</div>
+              <div style={{ fontSize: 9, color: mode.best_offer_pct > 0 ? PL.teal : PL.muted, fontWeight: mode.best_offer_pct > 0 ? 600 : 400, lineHeight: 1.3 }}>
+                {mode.best_offer_label || (isNA ? 'Not available' : '—')}
+              </div>
+              {mode.best_saving_paise > 0 && (
+                <div style={{ fontSize: 9, color: PL.mint, fontWeight: 700, marginTop: 2 }}>Save ₹{(mode.best_saving_paise / 100).toFixed(0)}</div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function CheckoutPage() {
   const { user } = useAuth()
   const [phase, setPhase] = useState('cart')
@@ -50,6 +109,8 @@ export default function CheckoutPage() {
   const [error, setError] = useState(null)
   const [applying, setApplying] = useState(false)
   const [showCatalog, setShowCatalog] = useState(false)
+  const [selectedCardIdx, setSelectedCardIdx] = useState(0)
+  const [txnId, setTxnId] = useState(null)
 
   const totalPaise = useMemo(
     () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
@@ -85,6 +146,23 @@ export default function CheckoutPage() {
   }, [firstCard?.bin, firstCard?.type])
 
   const walletBalances = user?.wallets?.reduce((acc, w) => ({ ...acc, [w.code]: w.balance_paise }), {}) ?? { PHONEPE: 45000, PAYTM: 20000 }
+
+  const precomputedModes = useMemo(() => {
+    const walletTotal = Object.values(walletBalances).reduce((s, v) => s + v, 0)
+    const hasCards = (user?.cards?.length || 0) > 0
+    const hasPoints = (user?.loyalty_points?.length || 0) > 0
+    return [
+      { mode: 'UPI', label: 'UPI', available: true, best_offer_pct: 2.0, best_offer_label: '2% cashback', best_saving_paise: Math.round(totalPaise * 0.02), emi_detail: null },
+      { mode: 'CARD', label: 'Credit/Debit Card', available: hasCards, best_offer_pct: 0, best_offer_label: hasCards ? 'Run Smart Apply to see card offers' : 'No cards linked', best_saving_paise: 0, emi_detail: null },
+      { mode: 'NET_BANKING', label: 'Net Banking', available: true, best_offer_pct: 5.0, best_offer_label: '5% off on net banking', best_saving_paise: Math.round(totalPaise * 0.05), emi_detail: null },
+      { mode: 'EMI', label: 'EMI', available: totalPaise >= 300000, best_offer_pct: 0, best_offer_label: totalPaise >= 300000 ? 'Run Smart Apply for EMI options' : 'Min order ₹3,000', best_saving_paise: 0, emi_detail: null },
+      { mode: 'WALLET', label: 'Wallet', available: walletTotal > 0, best_offer_pct: walletTotal >= totalPaise ? 5.0 : 0, best_offer_label: walletTotal > 0 ? `₹${(walletTotal / 100).toLocaleString('en-IN')} available` : 'No wallet balance', best_saving_paise: walletTotal >= totalPaise ? Math.round(totalPaise * 0.05) : 0, emi_detail: null },
+      { mode: 'BRAND_WALLET', label: 'Brand Wallet', available: false, best_offer_pct: 0, best_offer_label: 'Not configured', best_saving_paise: 0, emi_detail: null },
+      { mode: 'PAY_BY_POINTS', label: 'Pay by Points', available: hasPoints, best_offer_pct: 0, best_offer_label: hasPoints ? `${user.loyalty_points[0].points} pts available` : 'No points linked', best_saving_paise: user?.loyalty_points?.[0]?.value_paise || 0, emi_detail: null },
+      { mode: 'BANK_TRANSFER', label: 'Bank Transfer', available: true, best_offer_pct: 0, best_offer_label: 'No offers · NEFT/RTGS', best_saving_paise: 0, emi_detail: null },
+      { mode: 'OTHERS', label: 'Others', available: true, best_offer_pct: 0, best_offer_label: 'BNPL, PayLater', best_saving_paise: 0, emi_detail: null },
+    ]
+  }, [user, walletBalances, totalPaise])
 
   // Dynamic card BIN hint from logged-in user's cards
   const cardBinHint = useMemo(() => {
@@ -136,6 +214,29 @@ export default function CheckoutPage() {
       return () => clearTimeout(t)
     }
   }, [recommendation, phase])
+
+  // Save transaction to localStorage and generate ID when payment completes
+  useEffect(() => {
+    if (phase === 'done' && recommendation && !txnId) {
+      const id = `TXN-${Date.now().toString(36).toUpperCase()}`
+      setTxnId(id)
+      try {
+        const txn = {
+          id,
+          timestamp: new Date().toISOString(),
+          cart_items: cart.map(i => ({ name: i.name, image: i.image, price: i.price, quantity: i.quantity })),
+          total_paise: totalPaise,
+          saving_paise: recommendation.net_saving_paise || 0,
+          paid_paise: recommendation.effective_amount_paise || totalPaise,
+          payment_method: recommendation.recommended_method || 'CARD',
+          session_id: sessionId,
+        }
+        const prev = JSON.parse(localStorage.getItem('checkoutiq_transactions') || '[]')
+        localStorage.setItem('checkoutiq_transactions', JSON.stringify([txn, ...prev].slice(0, 20)))
+      } catch (_) {}
+    }
+    if (phase !== 'done') setTxnId(null)
+  }, [phase, recommendation])
 
   const handleApply = async () => {
     setApplying(true)
@@ -307,67 +408,87 @@ export default function CheckoutPage() {
         <div>
           <p style={{ fontSize: 12, color: PL.muted, marginBottom: 16 }}>
             Session: <code style={{ background: `${PL.green}08`, padding: '2px 8px', borderRadius: 6, color: PL.green, fontWeight: 600, fontSize: 11 }}>{sessionId?.slice(0, 8)}...</code>
-            &nbsp;·&nbsp; Cart total: <strong style={{ color: PL.green }}>₹{totalRupees.toLocaleString('en-IN')}</strong>
+            &nbsp;·&nbsp; Total: <strong style={{ color: PL.green }}>₹{totalRupees.toLocaleString('en-IN')}</strong>
           </p>
 
-          <div style={{ ...cardStyle, marginBottom: 20 }}>
-            <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: PL.green }}>Card Details (demo)</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 11, color: PL.muted, display: 'block', marginBottom: 5, fontWeight: 500 }}>Card BIN (first 6)</label>
-                <input value={cardBin} onChange={e => setCardBin(e.target.value)}
-                  style={{
-                    width: '100%', border: `1.5px solid ${PL.border}`,
-                    borderRadius: 10, padding: '10px 12px', fontSize: 13,
-                    boxSizing: 'border-box', outline: 'none', color: PL.green,
-                    transition: 'border-color 0.2s',
-                  }}
-                  onFocus={e => e.target.style.borderColor = PL.mint}
-                  onBlur={e => e.target.style.borderColor = PL.border}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: PL.muted, display: 'block', marginBottom: 5, fontWeight: 500 }}>Card Type</label>
-                <select value={cardType} onChange={e => setCardType(e.target.value)}
-                  style={{
-                    width: '100%', border: `1.5px solid ${PL.border}`,
-                    borderRadius: 10, padding: '10px 12px', fontSize: 13,
-                    color: PL.green, background: PL.white, outline: 'none',
-                  }}>
-                  <option value="CREDIT">Credit</option>
-                  <option value="DEBIT">Debit</option>
-                </select>
-              </div>
-            </div>
-            <p style={{ fontSize: 11, color: PL.muted, marginTop: 10 }}>
-              {cardBinHint.split(' · ').map((part, i) => {
-                const [bin, label] = part.split(' = ')
-                return (
-                  <span key={bin ?? i}>
-                    {i > 0 && ' · '}
-                    {bin != null && (
-                      <span style={{ color: PL.mint, fontWeight: 600 }}>{bin}</span>
-                    )}
-                    {label != null && ` = ${label}`}
-                  </span>
-                )
-              })}
-            </p>
+          {/* ── Card / Payment Instrument Selector ─── */}
+          <div style={{ ...cardStyle, marginBottom: 16 }}>
+            {user?.cards?.length > 0 ? (
+              <>
+                <p style={{ fontSize: 11, fontWeight: 700, color: PL.muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Your Cards</p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {user.cards.map((card, idx) => (
+                    <button key={card.id}
+                      onClick={() => { setSelectedCardIdx(idx); setCardBin(card.bin); setCardType(card.type) }}
+                      style={{
+                        padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                        border: `2px solid ${idx === selectedCardIdx ? PL.mint : PL.border}`,
+                        background: idx === selectedCardIdx ? `${PL.mint}15` : PL.white,
+                        color: PL.green, transition: 'all 0.15s',
+                      }}>
+                      <div style={{ fontSize: 12, fontWeight: 700 }}>{card.bank} •••• {card.last4}</div>
+                      <div style={{ fontSize: 10, color: PL.muted }}>{card.network} · {card.type}{card.reward_rate_pct ? ` · ${card.reward_rate_pct}% rewards` : ''}</div>
+                    </button>
+                  ))}
+                </div>
+                {user.upi_handles?.length > 0 && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${PL.border}`, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color: PL.muted, fontWeight: 600 }}>UPI:</span>
+                    {user.upi_handles.map(u => (
+                      <span key={u.handle} style={{ fontSize: 11, color: PL.green, fontWeight: 500, background: `${PL.green}08`, padding: '2px 8px', borderRadius: 6 }}>{u.handle}</span>
+                    ))}
+                  </div>
+                )}
+                {user.net_banking?.length > 0 && (
+                  <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color: PL.muted, fontWeight: 600 }}>Net Banking:</span>
+                    {user.net_banking.map(nb => (
+                      <span key={nb.bank} style={{ fontSize: 11, color: PL.green, fontWeight: 500, background: `${PL.green}08`, padding: '2px 8px', borderRadius: 6 }}>{nb.bank} {nb.account_type}</span>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: PL.green }}>Payment Info</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 11, color: PL.muted, display: 'block', marginBottom: 5, fontWeight: 500 }}>Card BIN (first 6)</label>
+                    <input value={cardBin} onChange={e => setCardBin(e.target.value)}
+                      style={{ width: '100%', border: `1.5px solid ${PL.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 13, boxSizing: 'border-box', outline: 'none', color: PL.green }}
+                      onFocus={e => e.target.style.borderColor = PL.mint}
+                      onBlur={e => e.target.style.borderColor = PL.border}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: PL.muted, display: 'block', marginBottom: 5, fontWeight: 500 }}>Card Type</label>
+                    <select value={cardType} onChange={e => setCardType(e.target.value)}
+                      style={{ width: '100%', border: `1.5px solid ${PL.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 13, color: PL.green, background: PL.white, outline: 'none' }}>
+                      <option value="CREDIT">Credit</option>
+                      <option value="DEBIT">Debit</option>
+                    </select>
+                  </div>
+                </div>
+                <p style={{ fontSize: 11, color: PL.muted, marginTop: 10 }}>Try: 401200 = HDFC · 521234 = SBI · 421653 = Axis</p>
+              </>
+            )}
           </div>
+
+          {/* ── All payment modes with estimated offers ─── */}
+          <PaymentModesGrid modes={precomputedModes} recommended={null} />
 
           <button onClick={handleSmartApply}
             style={{
               width: '100%', background: `linear-gradient(135deg, ${PL.green}, ${PL.green}dd)`,
               color: PL.mint, border: 'none', borderRadius: 12, padding: '15px 0',
-              fontSize: 15, fontWeight: 700, cursor: 'pointer',
+              fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 12,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              boxShadow: `0 4px 16px ${PL.green}30`,
-              transition: 'transform 0.15s, box-shadow 0.15s',
+              boxShadow: `0 4px 16px ${PL.green}30`, transition: 'transform 0.15s, box-shadow 0.15s',
             }}
-            onMouseEnter={e => { e.target.style.transform = 'translateY(-1px)'; e.target.style.boxShadow = `0 6px 24px ${PL.green}40` }}
-            onMouseLeave={e => { e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = `0 4px 16px ${PL.green}30` }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = `0 6px 24px ${PL.green}40` }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = `0 4px 16px ${PL.green}30` }}
           >
-            <Zap size={17} fill={PL.mint} color={PL.mint} /> Smart Apply
+            <Zap size={17} fill={PL.mint} color={PL.mint} /> ⚡ Smart Apply — Best Offer Across All Modes
           </button>
 
           <button onClick={handleSimulateAbandonment}
@@ -375,11 +496,10 @@ export default function CheckoutPage() {
               width: '100%', background: 'transparent',
               color: PL.yellow, border: `1.5px solid ${PL.yellow}50`,
               borderRadius: 12, padding: '12px 0',
-              fontSize: 13, cursor: 'pointer', marginTop: 12, fontWeight: 600,
-              transition: 'all 0.2s',
+              fontSize: 13, cursor: 'pointer', fontWeight: 600, transition: 'all 0.2s',
             }}
-            onMouseEnter={e => { e.target.style.background = `${PL.yellow}10`; e.target.style.borderColor = PL.yellow }}
-            onMouseLeave={e => { e.target.style.background = 'transparent'; e.target.style.borderColor = `${PL.yellow}50` }}
+            onMouseEnter={e => { e.currentTarget.style.background = `${PL.yellow}10`; e.currentTarget.style.borderColor = PL.yellow }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = `${PL.yellow}50` }}
           >
             ⚡ Simulate Abandonment (demo Layer 2)
           </button>
@@ -408,29 +528,82 @@ export default function CheckoutPage() {
           <div style={{ ...cardStyle, marginBottom: 16 }}>
             <AgentProgressBar agentStatus={agentStatus} wave1={WAVE_1} wave2={WAVE_2} wave3={WAVE_3} events={events} />
           </div>
+          {recommendation?.mode_breakdown?.length > 0 && (
+            <PaymentModesGrid
+              modes={recommendation.mode_breakdown}
+              recommended={recommendation.recommended_method}
+            />
+          )}
           <RecommendationCard recommendation={recommendation} onApply={handleApply} loading={applying} />
         </div>
       )}
 
       {/* ── DONE ───────────────────────────────────────────────── */}
       {phase === 'done' && (
-        <div style={{ textAlign: 'center', padding: '48px 0' }}>
-          <div style={{
-            width: 72, height: 72, background: `${PL.mint}18`,
-            borderRadius: '50%', margin: '0 auto 20px', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', fontSize: 36,
-          }}>✅</div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: PL.green, marginBottom: 8 }}>Payment Successful</h2>
-          <p style={{ color: PL.mint, fontSize: 15, fontWeight: 600 }}>
-            Smart Apply saved you ₹{((recommendation?.net_saving_paise || 0) / 100).toFixed(0)}
-          </p>
-          <button onClick={() => { setPhase('cart'); setSessionId(null) }} style={{
-            marginTop: 20, background: `${PL.green}10`, border: `1px solid ${PL.border}`,
-            borderRadius: 10, padding: '10px 24px', fontSize: 13, fontWeight: 600,
-            color: PL.green, cursor: 'pointer',
-          }}>
-            ← New Checkout
-          </button>
+        <div>
+          <div style={{ textAlign: 'center', marginBottom: 20 }}>
+            <div style={{ width: 64, height: 64, background: `${PL.mint}18`, borderRadius: '50%', margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>✅</div>
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: PL.green, marginBottom: 2 }}>Payment Successful</h2>
+            <p style={{ color: PL.muted, fontSize: 11, margin: 0 }}>{new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+          </div>
+
+          {/* Order Summary */}
+          <div style={{ ...cardStyle, marginBottom: 12 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: PL.muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Order Summary</p>
+            {cart.map(item => (
+              <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: `1px solid ${PL.border}`, fontSize: 12 }}>
+                <span style={{ color: PL.green }}>{item.image} {item.name} ×{item.quantity}</span>
+                <span style={{ fontWeight: 600, color: PL.green }}>₹{(item.price * item.quantity / 100).toLocaleString('en-IN')}</span>
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0 3px', fontSize: 12 }}>
+              <span style={{ color: PL.muted }}>Subtotal</span>
+              <span style={{ color: PL.green, fontWeight: 600 }}>₹{(totalPaise / 100).toLocaleString('en-IN')}</span>
+            </div>
+            {(recommendation?.net_saving_paise || 0) > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 12 }}>
+                <span style={{ color: PL.teal, fontWeight: 700 }}>✦ Smart Apply savings</span>
+                <span style={{ color: PL.teal, fontWeight: 700 }}>−₹{(recommendation.net_saving_paise / 100).toFixed(0)}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0 0', borderTop: `2px solid ${PL.border}`, fontSize: 15, fontWeight: 800 }}>
+              <span style={{ color: PL.green }}>You Paid</span>
+              <span style={{ color: PL.mint }}>₹{((recommendation?.effective_amount_paise || totalPaise) / 100).toLocaleString('en-IN')}</span>
+            </div>
+          </div>
+
+          {/* Transaction Info */}
+          <div style={{ ...cardStyle, marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+              <span style={{ color: PL.muted }}>Payment method</span>
+              <span style={{ color: PL.green, fontWeight: 600 }}>{METHOD_LABELS[recommendation?.recommended_method] || recommendation?.recommended_method || 'Card'}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+              <span style={{ color: PL.muted }}>Transaction ID</span>
+              <span style={{ color: PL.green, fontWeight: 600, fontFamily: 'monospace', fontSize: 11 }}>{txnId || '—'}</span>
+            </div>
+          </div>
+
+          {(recommendation?.net_saving_paise || 0) > 0 && (
+            <div style={{ background: `${PL.mint}18`, border: `1px solid ${PL.mint}40`, borderRadius: 12, padding: '12px 16px', marginBottom: 14, textAlign: 'center' }}>
+              <p style={{ fontSize: 13, color: PL.green, fontWeight: 600, margin: 0 }}>
+                🎉 CheckoutIQ saved you{' '}
+                <span style={{ color: PL.mint, fontWeight: 900, fontSize: 17 }}>₹{(recommendation.net_saving_paise / 100).toFixed(0)}</span>
+                {' '}on this order!
+              </p>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => { setPhase('cart'); setSessionId(null) }}
+              style={{ flex: 1, background: `${PL.green}10`, border: `1px solid ${PL.border}`, borderRadius: 10, padding: '11px 0', fontSize: 13, fontWeight: 600, color: PL.green, cursor: 'pointer' }}>
+              ← New Order
+            </button>
+            <Link to="/profile"
+              style={{ flex: 1, background: PL.green, borderRadius: 10, padding: '11px 0', fontSize: 13, fontWeight: 600, color: PL.mint, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              View Profile →
+            </Link>
+          </div>
         </div>
       )}
 

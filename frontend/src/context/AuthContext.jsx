@@ -19,6 +19,16 @@ const USERS = [
       { code: 'PHONEPE', name: 'PhonePe', balance_paise: 45000 },
       { code: 'PAYTM', name: 'Paytm', balance_paise: 20000 },
     ],
+    upi_handles: [
+      { handle: 'rahul@phonepe', upi_app: 'PhonePe' },
+      { handle: 'rahulsharma@okaxis', upi_app: 'Google Pay' },
+    ],
+    net_banking: [
+      { bank: 'HDFC', account_type: 'SAVINGS' },
+    ],
+    loyalty_points: [
+      { program: 'HDFC SmartBuy', points: 2500, value_paise: 2500 },
+    ],
   },
   {
     id: 'user_002',
@@ -33,6 +43,13 @@ const USERS = [
       { code: 'AMAZON_PAY', name: 'Amazon Pay', balance_paise: 150000 },
       { code: 'PHONEPE', name: 'PhonePe', balance_paise: 8000 },
     ],
+    upi_handles: [
+      { handle: 'priya@amazonpay', upi_app: 'Amazon Pay' },
+    ],
+    net_banking: [
+      { bank: 'Axis', account_type: 'SAVINGS' },
+    ],
+    loyalty_points: [],
   },
   {
     id: 'user_003',
@@ -45,6 +62,16 @@ const USERS = [
     ],
     wallets: [
       { code: 'PAYTM', name: 'Paytm', balance_paise: 75000 },
+    ],
+    upi_handles: [
+      { handle: 'arjun@paytm', upi_app: 'Paytm' },
+    ],
+    net_banking: [
+      { bank: 'Kotak', account_type: 'SAVINGS' },
+      { bank: 'HDFC', account_type: 'CURRENT' },
+    ],
+    loyalty_points: [
+      { program: 'Kotak Rewards', points: 5000, value_paise: 5000 },
     ],
   },
 ]
