@@ -2,7 +2,7 @@
 
 Two-layer agentic checkout intelligence. Built for speed, resilience, and merchant observability.
 
-🚀 **Live Demo:** [checkoutiq-pinelabs.vercel.app](https://checkoutiq-pinelabs.vercel.app/login)  
+🚀 **Live Demo:** [checkoutiq-pinelabs.vercel.app](https://checkoutiq-pinelabs.vercel.app/)  
 ⚙️ **Backend API:** [100-53-193-229.sslip.io](https://100-53-193-229.sslip.io/docs)
 
 ---
