@@ -38,11 +38,20 @@ class CustomerDetails(BaseModel):
     customer_id: Optional[str] = None
 
 
+class CartItem(BaseModel):
+    """Individual cart item."""
+    name: str
+    price_paise: int
+    quantity: int = 1
+    image_url: Optional[str] = None
+    category: Optional[str] = None
+
+
 class StartSessionRequest(BaseModel):
     """POST /checkout/session/start"""
     amount_paise: int             # e.g. 50000 = Rs.500
     customer: CustomerDetails
-    cart_items: Optional[List[dict]] = None
+    cart_items: Optional[List[CartItem]] = None
 
 
 class SmartApplyRequest(BaseModel):

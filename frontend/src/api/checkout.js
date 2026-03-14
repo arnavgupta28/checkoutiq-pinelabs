@@ -19,3 +19,20 @@ export const getStats = () =>
 
 export const getSessions = () =>
   api.get('/merchant/sessions').then(r => r.data)
+
+/* ── New merchant insight endpoints ──────────────────── */
+
+export const getAbandonmentLogs = () =>
+  api.get('/merchant/abandonment-logs').then(r => r.data)
+
+export const getRecoveryLogs = () =>
+  api.get('/merchant/recovery-logs').then(r => r.data)
+
+export const getRecoveryRules = () =>
+  api.get('/merchant/recovery-rules').then(r => r.data)
+
+export const getRecoveryMetrics = () =>
+  api.get('/merchant/recovery-metrics').then(r => r.data)
+
+export const recordOfferChosen = (offerId, bank = 'unknown', savingPaise = 0) =>
+  api.post('/merchant/offer-chosen', { offer_id: offerId, bank, saving_paise: savingPaise }).then(r => r.data)

@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
-import { startSession, triggerSmartApply } from '../api/checkout'
+import { useState, useEffect, useMemo } from 'react'
+import { startSession, triggerSmartApply, recordOfferChosen } from '../api/checkout'
 import { triggerRecovery } from '../api/recovery'
 import { useCheckoutWS } from '../hooks/useCheckoutWS'
 import AgentProgressBar from '../components/SmartApply/AgentProgressBar'
 import RecommendationCard from '../components/SmartApply/RecommendationCard'
 import { DiagnosisPanel, NudgePreview } from '../components/Abandonment/DiagnosisPanel'
-import { Zap, ShoppingCart } from 'lucide-react'
+import { Zap, ShoppingCart, Plus, Minus, Trash2 } from 'lucide-react'
 
 /* ── Pine Labs brand tokens ───────────────────────────── */
 const PL = {
@@ -21,22 +21,57 @@ const PL = {
   muted:  '#003323' + '70',
 }
 
-const DEMO_CART = [
-  { name: 'Samsung Galaxy S24', price: 79999, image: '📱' },
+/* ── Product catalogue ───────────────────────────────── */
+const PRODUCT_CATALOG = [
+  { id: 'galaxy-s24',    name: 'Samsung Galaxy S24',    price: 7999900, image: '📱', category: 'Electronics' },
+  { id: 'airpods-pro',   name: 'AirPods Pro 2',        price: 2499900, image: '🎧', category: 'Electronics' },
+  { id: 'macbook-air',   name: 'MacBook Air M3',       price: 11499900, image: '💻', category: 'Electronics' },
+  { id: 'nike-dunk',     name: 'Nike Dunk Low',        price: 899900, image: '👟', category: 'Fashion' },
+  { id: 'watch-ultra',   name: 'Apple Watch Ultra 2',  price: 8999900, image: '⌚', category: 'Electronics' },
+  { id: 'kindle-paper',  name: 'Kindle Paperwhite',    price: 1699900, image: '📖', category: 'Electronics' },
 ]
 
 export default function CheckoutPage() {
   const [phase, setPhase] = useState('cart')
+  const [cart, setCart] = useState([
+    { ...PRODUCT_CATALOG[0], quantity: 1 },
+  ])
   const [sessionId, setSessionId] = useState(null)
   const [cardBin, setCardBin] = useState('401200')
   const [cardType, setCardType] = useState('CREDIT')
   const [error, setError] = useState(null)
   const [applying, setApplying] = useState(false)
+  const [showCatalog, setShowCatalog] = useState(false)
 
-  const amount = 7999900
+  const totalPaise = useMemo(
+    () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [cart]
+  )
+  const totalRupees = totalPaise / 100
+
   const { agentStatus, recommendation, recovery, events, AGENTS, WAVE_1, WAVE_2, WAVE_3 } = useCheckoutWS(sessionId)
 
+  const addToCart = (product) => {
+    setCart(prev => {
+      const existing = prev.find(i => i.id === product.id)
+      if (existing) return prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i)
+      return [...prev, { ...product, quantity: 1 }]
+    })
+    setShowCatalog(false)
+  }
+
+  const updateQty = (id, delta) => {
+    setCart(prev => prev.map(i => {
+      if (i.id !== id) return i
+      const q = i.quantity + delta
+      return q > 0 ? { ...i, quantity: q } : i
+    }))
+  }
+
+  const removeItem = (id) => setCart(prev => prev.filter(i => i.id !== id))
+
   const handleStartSession = async () => {
+    if (cart.length === 0) { setError('Add at least one item'); return }
     setError(null)
     const customer = {
       first_name: 'Rahul', last_name: 'Sharma',
@@ -44,13 +79,12 @@ export default function CheckoutPage() {
       country_code: '91',
     }
     try {
-      const res = await startSession({
-        amount_paise: amount,
-        customer,
-      })
-      try {
-        localStorage.setItem('checkoutiq_customer', JSON.stringify(customer))
-      } catch (_) {}
+      const cartItems = cart.map(i => ({
+        name: i.name, price_paise: i.price, quantity: i.quantity,
+        image_url: null, category: i.category,
+      }))
+      const res = await startSession({ amount_paise: totalPaise, customer, cart_items: cartItems })
+      try { localStorage.setItem('checkoutiq_customer', JSON.stringify(customer)) } catch (_) {}
       setSessionId(res.session_id)
       setPhase('paying')
     } catch (e) {
@@ -77,6 +111,16 @@ export default function CheckoutPage() {
 
   const handleApply = async () => {
     setApplying(true)
+    // Record the offer chosen for popularity tracking
+    if (recommendation?.offer_id && sessionId) {
+      try {
+        await recordOfferChosen(
+          recommendation.offer_id,
+          recommendation.recommended_card_hint || 'unknown',
+          recommendation.net_saving_paise || 0
+        )
+      } catch (_) {}
+    }
     await new Promise(r => setTimeout(r, 2000))
     setApplying(false)
     setPhase('done')
@@ -101,7 +145,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div style={{ maxWidth: 460, margin: '0 auto', padding: '28px 16px', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ maxWidth: 500, margin: '0 auto', padding: '28px 16px', fontFamily: 'Inter, system-ui, sans-serif' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
@@ -131,28 +175,99 @@ export default function CheckoutPage() {
       {/* ── CART PHASE ─────────────────────────────────────────── */}
       {phase === 'cart' && (
         <div>
-          <div style={{ ...cardStyle, marginBottom: 20 }}>
-            {DEMO_CART.map((item, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <span style={{ fontSize: 40 }}>{item.image}</span>
-                <div>
-                  <p style={{ fontWeight: 700, margin: 0, fontSize: 15, color: PL.green }}>{item.name}</p>
-                  <p style={{ color: PL.mint, fontWeight: 800, margin: '4px 0 0', fontSize: 18 }}>
-                    ₹{item.price.toLocaleString('en-IN')}
+          <div style={{ ...cardStyle, marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <p style={{ fontWeight: 700, fontSize: 14, color: PL.green, margin: 0 }}>Your Cart ({cart.length})</p>
+              <button onClick={() => setShowCatalog(v => !v)} style={{
+                background: `${PL.mint}18`, border: `1px solid ${PL.mint}40`, borderRadius: 8,
+                padding: '5px 12px', fontSize: 11, fontWeight: 700, color: PL.green,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                <Plus size={13} /> Add Item
+              </button>
+            </div>
+
+            {cart.length === 0 && (
+              <p style={{ fontSize: 13, color: PL.muted, textAlign: 'center', padding: '20px 0' }}>
+                Cart is empty. Add items from the catalogue.
+              </p>
+            )}
+
+            {cart.map(item => (
+              <div key={item.id} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 0', borderBottom: `1px solid ${PL.border}`,
+              }}>
+                <span style={{ fontSize: 32, flexShrink: 0 }}>{item.image}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontWeight: 600, margin: 0, fontSize: 13, color: PL.green, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</p>
+                  <p style={{ color: PL.mint, fontWeight: 800, margin: '2px 0 0', fontSize: 14 }}>
+                    ₹{(item.price / 100).toLocaleString('en-IN')}
                   </p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => updateQty(item.id, -1)} style={{
+                    width: 28, height: 28, borderRadius: 8, border: `1px solid ${PL.border}`,
+                    background: PL.white, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}><Minus size={13} color={PL.green} /></button>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: PL.green, minWidth: 20, textAlign: 'center' }}>{item.quantity}</span>
+                  <button onClick={() => updateQty(item.id, 1)} style={{
+                    width: 28, height: 28, borderRadius: 8, border: `1px solid ${PL.mint}`,
+                    background: `${PL.mint}15`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}><Plus size={13} color={PL.green} /></button>
+                  <button onClick={() => removeItem(item.id)} style={{
+                    width: 28, height: 28, borderRadius: 8, border: 'none',
+                    background: `${PL.yellow}12`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginLeft: 4,
+                  }}><Trash2 size={13} color={PL.yellow} /></button>
                 </div>
               </div>
             ))}
+
+            {/* Total */}
+            {cart.length > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 14 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: PL.muted }}>Total</span>
+                <span style={{ fontSize: 20, fontWeight: 900, color: PL.green }}>₹{totalRupees.toLocaleString('en-IN')}</span>
+              </div>
+            )}
           </div>
+
+          {/* Product catalogue dropdown */}
+          {showCatalog && (
+            <div style={{ ...cardStyle, marginBottom: 16, maxHeight: 250, overflowY: 'auto' }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: PL.muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Browse Products</p>
+              {PRODUCT_CATALOG.filter(p => !cart.find(c => c.id === p.id && c.quantity >= 5)).map(product => (
+                <div key={product.id} onClick={() => addToCart(product)} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px 8px',
+                  borderRadius: 8, cursor: 'pointer', transition: 'background 0.15s',
+                  borderBottom: `1px solid ${PL.border}`,
+                }}
+                  onMouseEnter={e => e.currentTarget.style.background = `${PL.mint}10`}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <span style={{ fontSize: 24 }}>{product.image}</span>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: PL.green }}>{product.name}</p>
+                    <p style={{ fontSize: 11, color: PL.muted, margin: 0 }}>{product.category}</p>
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: PL.mint }}>₹{(product.price / 100).toLocaleString('en-IN')}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           <button onClick={handleStartSession}
             style={{
               width: '100%', background: PL.green, color: PL.white,
               border: 'none', borderRadius: 12, padding: '15px 0',
               fontSize: 15, fontWeight: 700, cursor: 'pointer',
+              opacity: cart.length === 0 ? 0.5 : 1,
               transition: 'opacity 0.2s',
             }}
-            onMouseEnter={e => e.target.style.opacity = 0.9}
-            onMouseLeave={e => e.target.style.opacity = 1}
+            disabled={cart.length === 0}
+            onMouseEnter={e => { if (cart.length) e.target.style.opacity = 0.9 }}
+            onMouseLeave={e => { if (cart.length) e.target.style.opacity = 1 }}
           >
             Proceed to Payment →
           </button>
@@ -164,6 +279,7 @@ export default function CheckoutPage() {
         <div>
           <p style={{ fontSize: 12, color: PL.muted, marginBottom: 16 }}>
             Session: <code style={{ background: `${PL.green}08`, padding: '2px 8px', borderRadius: 6, color: PL.green, fontWeight: 600, fontSize: 11 }}>{sessionId?.slice(0, 8)}...</code>
+            &nbsp;·&nbsp; Cart total: <strong style={{ color: PL.green }}>₹{totalRupees.toLocaleString('en-IN')}</strong>
           </p>
 
           <div style={{ ...cardStyle, marginBottom: 20 }}>
@@ -242,7 +358,7 @@ export default function CheckoutPage() {
             <AgentProgressBar agentStatus={agentStatus} wave1={WAVE_1} wave2={WAVE_2} wave3={WAVE_3} events={events} />
           </div>
           <p style={{ fontSize: 12, color: PL.muted, textAlign: 'center' }}>
-            Pine Labs offer data → 6 agents reasoning → 1 optimal recommendation
+            Insight Engine (instant) → 2 LLM agents → optimal recommendation
           </p>
         </div>
       )}
@@ -269,6 +385,13 @@ export default function CheckoutPage() {
           <p style={{ color: PL.mint, fontSize: 15, fontWeight: 600 }}>
             Smart Apply saved you ₹{((recommendation?.net_saving_paise || 0) / 100).toFixed(0)}
           </p>
+          <button onClick={() => { setPhase('cart'); setSessionId(null) }} style={{
+            marginTop: 20, background: `${PL.green}10`, border: `1px solid ${PL.border}`,
+            borderRadius: 10, padding: '10px 24px', fontSize: 13, fontWeight: 600,
+            color: PL.green, cursor: 'pointer',
+          }}>
+            ← New Checkout
+          </button>
         </div>
       )}
 

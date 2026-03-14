@@ -14,6 +14,10 @@ from backend.models.checkout import StartSessionRequest, SmartApplyRequest, Appl
 from backend.integrations.pine_labs import pine_labs
 from backend.agents.smart_checkout.pipeline import run_pipeline as run_smart_checkout
 from backend.agents.abandonment.pipeline import run_recovery_pipeline
+from backend.agents.insights_db import (
+    get_abandonment_logs, get_recovery_logs, get_recovery_rules,
+    get_recovery_metrics, record_offer_chosen,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -411,6 +415,48 @@ async def merchant_stats():
 @app.get("/merchant/sessions")
 async def merchant_sessions():
     return {"sessions": list(sessions.values())}
+
+
+# ── MERCHANT — INSIGHTS DB ENDPOINTS ──────────────────────────────────────────
+
+@app.get("/merchant/abandonment-logs")
+async def get_merchant_abandonment_logs():
+    """Fetch all abandonment logs (cause, signals, confidence) from JSON DB."""
+    logs = await get_abandonment_logs()
+    return {"abandonment_logs": logs}
+
+
+@app.get("/merchant/recovery-logs")
+async def get_merchant_recovery_logs():
+    """Fetch all recovery logs (nudge, link, method, discount) from JSON DB."""
+    logs = await get_recovery_logs()
+    return {"recovery_logs": logs}
+
+
+@app.get("/merchant/recovery-rules")
+async def get_merchant_recovery_rules():
+    """Fetch rule-engine recovery rules for merchant understanding."""
+    rules = await get_recovery_rules()
+    return {"recovery_rules": rules}
+
+
+@app.get("/merchant/recovery-metrics")
+async def get_merchant_recovery_metrics():
+    """Aggregate recovery metrics: nudges sent/clicked/converted."""
+    metrics = await get_recovery_metrics()
+    return metrics
+
+
+@app.post("/merchant/offer-chosen")
+async def merchant_offer_chosen(body: dict):
+    """Record that a user chose a specific offer — feeds popularity stats."""
+    offer_id = body.get("offer_id", "")
+    bank = body.get("bank", "unknown")
+    saving_paise = body.get("saving_paise", 0)
+    if not offer_id:
+        raise HTTPException(400, "offer_id required")
+    await record_offer_chosen(offer_id, bank, saving_paise)
+    return {"recorded": True}
 
 
 @app.get("/health")
