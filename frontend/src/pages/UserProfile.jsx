@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { User, Mail, Phone, Globe, Hash, ArrowLeft, Pencil, Check, X } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 const STORAGE_KEY = 'checkoutiq_customer'
 
@@ -15,13 +16,22 @@ const PL = {
   muted:  '#003323' + '70',
 }
 
-const DEFAULT_CUSTOMER = {
-  first_name: 'Rahul',
-  last_name: 'Sharma',
-  email_id: 'rahul@example.com',
-  mobile_number: '9876543210',
-  country_code: '91',
-  customer_id: null,
+function parseName(fullName) {
+  const parts = (fullName || '').trim().split(/\s+/)
+  return { first_name: parts[0] || '', last_name: parts.slice(1).join(' ') || '' }
+}
+
+function userToCustomer(user) {
+  if (!user) return null
+  const { first_name, last_name } = parseName(user.name)
+  return {
+    first_name,
+    last_name,
+    email_id: user.email || '',
+    mobile_number: user.mobile || '',
+    country_code: '91',
+    customer_id: user.id || null,
+  }
 }
 
 function getStoredCustomer() {
@@ -49,16 +59,26 @@ const inputStyle = (PL) => ({
 })
 
 export default function UserProfile() {
-  const [customer, setCustomer] = useState(DEFAULT_CUSTOMER)
+  const { user } = useAuth()
+  const defaultFromUser = useMemo(() => userToCustomer(user) || {
+    first_name: '', last_name: '', email_id: '', mobile_number: '', country_code: '91', customer_id: null,
+  }, [user])
+  const [customer, setCustomer] = useState(defaultFromUser)
   const [isEditing, setIsEditing] = useState(false)
-  const [editForm, setEditForm] = useState({ ...DEFAULT_CUSTOMER })
+  const [editForm, setEditForm] = useState({ ...defaultFromUser })
 
   useEffect(() => {
+    const fromUser = userToCustomer(user)
+    if (!fromUser) return
     const stored = getStoredCustomer()
-    const merged = { ...DEFAULT_CUSTOMER, ...stored }
+    const isSameUser = stored && (
+      (stored.email_id && stored.email_id === user?.email) ||
+      (stored.customer_id && stored.customer_id === user?.id)
+    )
+    const merged = isSameUser ? { ...fromUser, ...stored } : fromUser
     setCustomer(merged)
     setEditForm(merged)
-  }, [])
+  }, [user])
 
   const startEdit = () => {
     setEditForm({ ...customer })
@@ -338,6 +358,38 @@ export default function UserProfile() {
           )}
         </div>
       </div>
+
+      {user?.cards?.length > 0 && (
+        <div style={{ ...cardStyle, marginBottom: 12 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, color: PL.green, margin: '0 0 12px 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Saved cards
+          </h3>
+          {user.cards.map((c) => (
+            <div key={c.id} style={{ ...rowStyle, borderBottom: `1px solid ${PL.border}` }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: PL.green }}>{c.bank} •••• {c.last4}</div>
+                <div style={{ fontSize: 12, color: PL.muted }}>{c.network} {c.type}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {user?.wallets?.length > 0 && (
+        <div style={{ ...cardStyle, marginBottom: 12 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, color: PL.green, margin: '0 0 12px 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Wallets
+          </h3>
+          {user.wallets.map((w) => (
+            <div key={w.code} style={{ ...rowStyle, borderBottom: `1px solid ${PL.border}` }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: PL.green }}>{w.name}</div>
+                <div style={{ fontSize: 12, color: PL.muted }}>₹{(w.balance_paise / 100).toLocaleString()}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <p style={{ fontSize: 12, color: PL.muted, margin: 0 }}>
         This data matches the backend <code style={{ background: `${PL.mint}20`, padding: '2px 6px', borderRadius: 4 }}>CustomerDetails</code> used for checkout sessions and recovery.

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { startSession, triggerSmartApply, recordOfferChosen } from '../api/checkout'
 import { triggerRecovery } from '../api/recovery'
 import { useCheckoutWS } from '../hooks/useCheckoutWS'
+import { useAuth } from '../context/AuthContext'
 import AgentProgressBar from '../components/SmartApply/AgentProgressBar'
 import RecommendationCard from '../components/SmartApply/RecommendationCard'
 import { DiagnosisPanel, NudgePreview } from '../components/Abandonment/DiagnosisPanel'
@@ -31,14 +32,21 @@ const PRODUCT_CATALOG = [
   { id: 'kindle-paper',  name: 'Kindle Paperwhite',    price: 1699900, image: '📖', category: 'Electronics' },
 ]
 
+function parseName(fullName) {
+  const parts = (fullName || '').trim().split(/\s+/)
+  return { first_name: parts[0] || '', last_name: parts.slice(1).join(' ') || '' }
+}
+
 export default function CheckoutPage() {
+  const { user } = useAuth()
   const [phase, setPhase] = useState('cart')
   const [cart, setCart] = useState([
     { ...PRODUCT_CATALOG[0], quantity: 1 },
   ])
   const [sessionId, setSessionId] = useState(null)
-  const [cardBin, setCardBin] = useState('401200')
-  const [cardType, setCardType] = useState('CREDIT')
+  const firstCard = user?.cards?.[0]
+  const [cardBin, setCardBin] = useState(firstCard?.bin ?? '401200')
+  const [cardType, setCardType] = useState(firstCard?.type ?? 'CREDIT')
   const [error, setError] = useState(null)
   const [applying, setApplying] = useState(false)
   const [showCatalog, setShowCatalog] = useState(false)
@@ -69,13 +77,33 @@ export default function CheckoutPage() {
   }
 
   const removeItem = (id) => setCart(prev => prev.filter(i => i.id !== id))
+  useEffect(() => {
+    if (firstCard) {
+      setCardBin(firstCard.bin)
+      setCardType(firstCard.type)
+    }
+  }, [firstCard?.bin, firstCard?.type])
+
+  const walletBalances = user?.wallets?.reduce((acc, w) => ({ ...acc, [w.code]: w.balance_paise }), {}) ?? { PHONEPE: 45000, PAYTM: 20000 }
+
+  // Dynamic card BIN hint from logged-in user's cards
+  const cardBinHint = useMemo(() => {
+    const cards = user?.cards
+    if (!cards?.length) {
+      return '401200 = HDFC Visa · 521234 = SBI · 421653 = Axis'
+    }
+    return cards.map(c => `${c.bin} = ${c.bank} ${c.network}`).join(' · ')
+  }, [user?.cards])
 
   const handleStartSession = async () => {
     if (cart.length === 0) { setError('Add at least one item'); return }
     setError(null)
+    const { first_name, last_name } = user ? parseName(user.name) : { first_name: 'Rahul', last_name: 'Sharma' }
     const customer = {
-      first_name: 'Rahul', last_name: 'Sharma',
-      email_id: 'rahul@example.com', mobile_number: '9876543210',
+      first_name,
+      last_name,
+      email_id: user?.email ?? 'rahul@example.com',
+      mobile_number: user?.mobile ?? '9876543210',
       country_code: '91',
     }
     try {
@@ -98,7 +126,7 @@ export default function CheckoutPage() {
       session_id: sessionId,
       card_bin: cardBin,
       card_type: cardType,
-      wallet_balances: { PHONEPE: 45000, PAYTM: 20000 },
+      wallet_balances: walletBalances,
     })
   }
 
@@ -312,7 +340,18 @@ export default function CheckoutPage() {
               </div>
             </div>
             <p style={{ fontSize: 11, color: PL.muted, marginTop: 10 }}>
-              <span style={{ color: PL.mint, fontWeight: 600 }}>401200</span> = HDFC Visa · <span style={{ color: PL.mint, fontWeight: 600 }}>521234</span> = SBI · <span style={{ color: PL.mint, fontWeight: 600 }}>421653</span> = Axis
+              {cardBinHint.split(' · ').map((part, i) => {
+                const [bin, label] = part.split(' = ')
+                return (
+                  <span key={bin ?? i}>
+                    {i > 0 && ' · '}
+                    {bin != null && (
+                      <span style={{ color: PL.mint, fontWeight: 600 }}>{bin}</span>
+                    )}
+                    {label != null && ` = ${label}`}
+                  </span>
+                )
+              })}
             </p>
           </div>
 

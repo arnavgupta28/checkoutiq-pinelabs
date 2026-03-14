@@ -1,0 +1,244 @@
+{
+  "offer_popularity": {
+    "3723": {
+      "chosen_count": 2,
+      "bank": "HDFC Bank",
+      "total_saving_paise": 34999400,
+      "last_chosen": "2026-03-14T10:19:41.448704+00:00"
+    }
+  },
+  "session_insights": {
+    "ce407f04-f2a1-40d4-b368-d54cf4c1c8de": {
+      "card": {
+        "card_bin": "401200",
+        "card_type": "CREDIT",
+        "bank": "HDFC Bank",
+        "network": "Visa",
+        "tier": "Platinum",
+        "base_reward_pct": 1.5,
+        "estimated_reward_paise": 277495
+      },
+      "offers": [
+        {
+          "bank": "HDFC Bank",
+          "offer_name": "No Cost EMI + Instant Cashback",
+          "offer_id": "3722",
+          "tenure_id": "7",
+          "program_type": "BRAND_OFFER",
+          "discount_type": "INSTANT",
+          "discount_pct": 10,
+          "discount_cap_paise": 100000,
+          "discount_paise": 100000,
+          "eligible": true,
+          "reason": "HDFC Bank 10% instant (max \u20b91000)"
+        },
+        {
+          "bank": "SBI Bank",
+          "offer_name": "Flat 5% Instant Discount",
+          "offer_id": "4100",
+          "tenure_id": "20",
+          "program_type": "BANK_OFFER",
+          "discount_type": "INSTANT",
+          "discount_pct": 5,
+          "discount_cap_paise": 50000,
+          "discount_paise": 0,
+          "eligible": false,
+          "reason": "Not eligible \u2014 card BIN 401200 not in SBI Bank bins"
+        },
+        {
+          "bank": "Axis Bank",
+          "offer_name": "15% Cashback (max Rs.750)",
+          "offer_id": "5200",
+          "tenure_id": "30",
+          "program_type": "BANK_OFFER",
+          "discount_type": "CASHBACK",
+          "discount_pct": 15,
+          "discount_cap_paise": 75000,
+          "discount_paise": 0,
+          "eligible": false,
+          "reason": "Not eligible \u2014 card BIN 401200 not in Axis Bank bins"
+        }
+      ],
+      "emi_options": [
+        {
+          "bank": "HDFC Bank",
+          "offer_id": "3723",
+          "tenure_id": "8",
+          "tenure_months": 3,
+          "interest_rate": 0,
+          "monthly_paise": 333333,
+          "total_emi_paise": 1000000,
+          "extra_cost_paise": -17499700,
+          "no_cost": true,
+          "reason": "HDFC Bank 3mo No-Cost EMI @ \u20b93333/mo"
+        },
+        {
+          "bank": "SBI Bank",
+          "offer_id": "4101",
+          "tenure_id": "21",
+          "tenure_months": 3,
+          "interest_rate": 12,
+          "monthly_paise": 341667,
+          "total_emi_paise": 1025000,
+          "extra_cost_paise": -17474700,
+          "no_cost": false,
+          "reason": "SBI Bank 3mo EMI @ 12% = \u20b93417/mo (extra \u20b9-174747)"
+        },
+        {
+          "bank": "HDFC Bank",
+          "offer_id": "3724",
+          "tenure_id": "9",
+          "tenure_months": 6,
+          "interest_rate": 14,
+          "monthly_paise": 173333,
+          "total_emi_paise": 1040000,
+          "extra_cost_paise": -17459700,
+          "no_cost": false,
+          "reason": "HDFC Bank 6mo EMI @ 14% = \u20b91733/mo (extra \u20b9-174597)"
+        }
+      ],
+      "wallet": {
+        "use_wallet": true,
+        "wallet_code": "PHONEPE",
+        "wallet_amount_paise": 45000,
+        "card_amount_paise": 18454700,
+        "reason": "Use \u20b9450 from PHONEPE, card pays \u20b9184547"
+      },
+      "ranked_options": [
+        {
+          "type": "EMI",
+          "method": "CREDIT_EMI",
+          "bank": "HDFC Bank",
+          "offer_id": "3723",
+          "tenure_id": "8",
+          "net_saving_paise": 17499700,
+          "effective_amount_paise": 1000000,
+          "monthly_paise": 333333,
+          "tenure_months": 3,
+          "interest_rate": 0,
+          "no_cost": true,
+          "eligible": true,
+          "reason": "HDFC Bank 3mo No-Cost EMI @ \u20b93333/mo"
+        },
+        {
+          "type": "EMI",
+          "method": "CREDIT_EMI",
+          "bank": "SBI Bank",
+          "offer_id": "4101",
+          "tenure_id": "21",
+          "net_saving_paise": 17474700,
+          "effective_amount_paise": 1025000,
+          "monthly_paise": 341667,
+          "tenure_months": 3,
+          "interest_rate": 12,
+          "no_cost": false,
+          "eligible": true,
+          "reason": "SBI Bank 3mo EMI @ 12% = \u20b93417/mo (extra \u20b9-174747)"
+        },
+        {
+          "type": "EMI",
+          "method": "CREDIT_EMI",
+          "bank": "HDFC Bank",
+          "offer_id": "3724",
+          "tenure_id": "9",
+          "net_saving_paise": 17459700,
+          "effective_amount_paise": 1040000,
+          "monthly_paise": 173333,
+          "tenure_months": 6,
+          "interest_rate": 14,
+          "no_cost": false,
+          "eligible": true,
+          "reason": "HDFC Bank 6mo EMI @ 14% = \u20b91733/mo (extra \u20b9-174597)"
+        },
+        {
+          "type": "INSTANT_DISCOUNT",
+          "method": "CARD",
+          "bank": "HDFC Bank",
+          "offer_id": "3722",
+          "tenure_id": "7",
+          "net_saving_paise": 100000,
+          "effective_amount_paise": 18399700,
+          "eligible": true,
+          "reason": "HDFC Bank 10% instant (max \u20b91000)"
+        },
+        {
+          "type": "INSTANT_DISCOUNT",
+          "method": "CARD",
+          "bank": "SBI Bank",
+          "offer_id": "4100",
+          "tenure_id": "20",
+          "net_saving_paise": 0,
+          "effective_amount_paise": 18499700,
+          "eligible": false,
+          "reason": "Not eligible \u2014 card BIN 401200 not in SBI Bank bins"
+        }
+      ],
+      "best_option": {
+        "type": "EMI",
+        "method": "CREDIT_EMI",
+        "bank": "HDFC Bank",
+        "offer_id": "3723",
+        "tenure_id": "8",
+        "net_saving_paise": 17499700,
+        "effective_amount_paise": 1000000,
+        "monthly_paise": 333333,
+        "tenure_months": 3,
+        "interest_rate": 0,
+        "no_cost": true,
+        "eligible": true,
+        "reason": "HDFC Bank 3mo No-Cost EMI @ \u20b93333/mo"
+      },
+      "total_options_found": 6,
+      "saved_at": "2026-03-14T10:18:41.124381+00:00"
+    }
+  },
+  "abandonment_logs": [],
+  "recovery_logs": [],
+  "recovery_rules": [
+    {
+      "rule_id": "R1",
+      "name": "Payment Failure Recovery",
+      "trigger": "PAYMENT_FAILED / ORDER_CANCELLED / ORDER_FAILED",
+      "description": "When Pine Labs webhook fires a payment failure, Layer 2 diagnosis agent analyses behavioral signals (time on screen, methods hovered, retry count) to identify the primary abandonment cause.",
+      "action": "Generate personalised recovery nudge + Pine Labs pay-by-link with pre-applied offer",
+      "sla": "< 5 seconds",
+      "enabled": true
+    },
+    {
+      "rule_id": "R2",
+      "name": "Price Sensitivity Detection",
+      "trigger": "time_on_payment_screen > 120s AND scrolled_to_emi = true",
+      "description": "User spent over 2 minutes and scrolled to EMI section \u2014 strong signal of price sensitivity. They want to buy but need affordability help.",
+      "action": "Nudge with No-Cost EMI breakdown showing \u20b9X/month + pre-select cheapest EMI tenure",
+      "sla": "Real-time (WebSocket push)",
+      "enabled": true
+    },
+    {
+      "rule_id": "R3",
+      "name": "Auth Failure Redirect",
+      "trigger": "retry_attempts >= 2 AND error_code = USER_AUTHENTICATION_FAILED",
+      "description": "User tried 2+ times but OTP/authentication failed \u2014 payment friction, not intent issue.",
+      "action": "Suggest simpler payment method (UPI Intent / saved card) via recovery link",
+      "sla": "< 3 seconds after webhook",
+      "enabled": true
+    },
+    {
+      "rule_id": "R4",
+      "name": "Option Confusion Resolver",
+      "trigger": "methods_hovered includes CARD + UPI but no payment initiated",
+      "description": "User browsed multiple payment methods but didn't commit \u2014 likely confused by too many options or unsure which gives best deal.",
+      "action": "Send Smart Apply recommendation as nudge showing best offer with reason trail",
+      "sla": "< 5 seconds",
+      "enabled": true
+    },
+    {
+      "rule_id": "R5",
+      "name": "Threshold Unlock Nudge",
+      "trigger": "cart_value within 10% of offer threshold",
+      "description": "Cart value is very close to an offer's minimum threshold \u2014 user might add a small item to unlock the discount.",
+      "action": "Nudge: 'Add \u20b9X more to unlock Y% discount' with recommended add-on items",
+      "sla": "Real-time",
+      "enabled": true
+    }
+  ]
+}
