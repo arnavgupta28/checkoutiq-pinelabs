@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import CheckoutPage from './pages/CheckoutPage'
 import Dashboard from './pages/Dashboard'
+import UserProfile from './pages/UserProfile'
+import { User } from 'lucide-react'
 
 /* ── Pine Labs brand tokens ────────────────────────────────────────────── */
 const PL = {
@@ -36,12 +38,31 @@ function Nav() {
       </span>
       {link('/checkout', 'Checkout Demo')}
       {link('/', 'Merchant Dashboard')}
-      <span style={{
-        marginLeft: 'auto', fontSize: 10, fontWeight: 600,
-        background: 'rgba(80,211,135,0.15)', color: PL.mint,
-        padding: '4px 10px', borderRadius: 20, letterSpacing: '0.04em',
-      }}>
-        PINE LABS HACKATHON
+      <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Link
+          to="/profile"
+          title="User profile"
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: '50%',
+            background: loc.pathname === '/profile' ? PL.mint : 'rgba(80,211,135,0.2)',
+            color: loc.pathname === '/profile' ? PL.green : PL.mint,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s',
+          }}
+        >
+          <User size={18} />
+        </Link>
+        <span style={{
+          fontSize: 10, fontWeight: 600,
+          background: 'rgba(80,211,135,0.15)', color: PL.mint,
+          padding: '4px 10px', borderRadius: 20, letterSpacing: '0.04em',
+        }}>
+          PINE LABS HACKATHON
+        </span>
       </span>
     </nav>
   )
@@ -54,6 +75,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/profile" element={<UserProfile />} />
       </Routes>
     </BrowserRouter>
   )

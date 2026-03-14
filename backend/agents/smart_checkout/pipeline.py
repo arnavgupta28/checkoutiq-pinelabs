@@ -331,49 +331,23 @@ async def run_pipeline(
             "alternatives": [],
         }
 
-    # ════════════════════════════════════════════════════════════════════════
-    # WAVE 3: Decision agent (sequential, reads Wave 2)
-    # ════════════════════════════════════════════════════════════════════════
-
-    await status_callback("decision_agent", "running")
+    # Parse result — CrewAI >=0.63 returns CrewOutput object; use .raw for the text
+    import re
     try:
-        decision_crew = Crew(
-            agents=[_make_decision_agent(llm)],
-            tasks=[Task(
-                description=f"Select best payment config. Conflict resolver output:\n{conflict_output}\n\nOriginal context:\n{context}",
-                expected_output='JSON: {"recommended_method":"CARD"|"EMI", "offer_id":"...", "net_saving_paise":500, "effective_amount_paise":9500, "reason_trail":[...]}',
-                agent=_make_decision_agent(llm)
-            )],
-            process=Process.sequential,
-            verbose=False,
-        )
-        decision_result = await asyncio.to_thread(decision_crew.kickoff)
-        await status_callback("decision_agent", "completed")
-        final_output = str(decision_result)
-
-        # Parse JSON from final output
-        import re
-        raw = final_output
+        raw = result.raw if hasattr(result, 'raw') else str(result)
+        logger.info(f"[Layer1] Raw crew output (first 500 chars): {raw[:500]}")
+        # Strip thinking block (<think>...</think>) — qwen3 thinking mode
         raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
         raw = re.sub(r'```(?:json)?\s*|\s*```', '', raw).strip()
         match = re.search(r'\{.*\}', raw, re.DOTALL)
         if match:
-            return json.loads(match.group())
-    except Exception as e:
-        import traceback
-        error_trace = traceback.format_exc()
-        logger.error(f"[Layer1] decision_agent failed:\n{error_trace}")
-        await status_callback("decision_agent", "failed", error=str(e), trace=error_trace)
-        return {
-            "recommended_method": "FALLBACK",
-            "offer_id": None,
-            "tenure_id": None,
-            "net_saving_paise": 0,
-            "effective_amount_paise": amount_paise,
-            "reason_trail": ["Decision synthesis failed. Please try again."],
-            "failures": [{"agent": "decision_agent", "error": str(e)}],
-            "alternatives": [],
-        }
+            parsed = json.loads(match.group())
+            logger.info(f"[Layer1] Pipeline parsed OK — method={parsed.get('recommended_method')} saving={parsed.get('net_saving_paise')}")
+            return parsed
+        else:
+            logger.warning(f"[Layer1] No JSON object found in output. Full raw: {raw[:1000]}")
+    except Exception as parse_err:
+        logger.warning(f"[Layer1] JSON parse error: {parse_err}. Raw: {raw[:500]}")
 
     # Fallback
     return {

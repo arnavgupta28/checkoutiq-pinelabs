@@ -138,26 +138,25 @@ Generate recovery strategy with nudge_message, discount, suggested_method.
         await status_callback("recovery_crafter", "failed", error=str(e), trace=error_trace)
         recovery_output = ""
 
-    # Parse both outputs
+    # Parse recovery output
+    # CrewAI >=0.63 returns CrewOutput object; use .raw for the text
+    import re
     try:
-        import re
-        
-        # Parse diagnosis
-        raw_diag = diagnosis_output
-        raw_diag = re.sub(r'<think>.*?</think>', '', raw_diag, flags=re.DOTALL).strip()
-        raw_diag = re.sub(r'```(?:json)?\s*|\s*```', '', raw_diag).strip()
-        match_diag = re.search(r'\{.*\}', raw_diag, re.DOTALL)
-        diagnosis_data = json.loads(match_diag.group()) if match_diag else {}
-
-        # Parse recovery
-        raw_rec = recovery_output
-        raw_rec = re.sub(r'<think>.*?</think>', '', raw_rec, flags=re.DOTALL).strip()
-        raw_rec = re.sub(r'```(?:json)?\s*|\s*```', '', raw_rec).strip()
-        match_rec = re.search(r'\{.*\}', raw_rec, re.DOTALL)
-        recovery_data = json.loads(match_rec.group()) if match_rec else {}
+        raw = crew_result.raw if hasattr(crew_result, 'raw') else str(crew_result)
+        logger.info(f"[Layer2] Raw crew output (first 500 chars): {raw[:500]}")
+        # Strip thinking block (<think>...</think>) — qwen3 thinking mode
+        raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
+        # Strip markdown code fences
+        raw = re.sub(r'```(?:json)?\s*|\s*```', '', raw).strip()
+        # Find outermost JSON object
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        recovery_data = json.loads(match.group()) if match else {}
+        if recovery_data:
+            logger.info(f"[Layer2] Pipeline parsed OK — cause={recovery_data.get('primary_cause')}")
+        else:
+            logger.warning(f"[Layer2] No JSON found in output. Full raw: {raw[:1000]}")
     except Exception as parse_err:
-        logger.warning(f"[Layer2] JSON parse error: {parse_err}")
-        diagnosis_data = {}
+        logger.warning(f"[Layer2] JSON parse error: {parse_err}. Raw: {raw[:500]}")
         recovery_data = {}
 
     nudge_msg = recovery_data.get("nudge_message", f"Complete your ₹{amount_paise//100} order!")

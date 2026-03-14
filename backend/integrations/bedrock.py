@@ -46,7 +46,7 @@ def _lmstudio_llm(max_tokens=1024):
         base_url=settings.LM_STUDIO_BASE_URL,
         api_key="lm-studio",                           # LM Studio ignores this value
         temperature=0.1,
-        max_tokens=max_tokens,
+        max_tokens=2048,  # thinking block alone can be 500+ tokens; need headroom for JSON answer
     )
 
 
