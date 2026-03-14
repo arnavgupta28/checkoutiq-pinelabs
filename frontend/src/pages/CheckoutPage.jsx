@@ -34,7 +34,7 @@ export default function CheckoutPage() {
   const [applying, setApplying] = useState(false)
 
   const amount = 7999900
-  const { agentStatus, recommendation, recovery, AGENTS } = useCheckoutWS(sessionId)
+  const { agentStatus, recommendation, recovery, events, AGENTS, WAVE_1, WAVE_2, WAVE_3 } = useCheckoutWS(sessionId)
 
   const handleStartSession = async () => {
     setError(null)
@@ -239,7 +239,7 @@ export default function CheckoutPage() {
               <Zap size={16} color={PL.mint} />
               <span style={{ fontSize: 14, fontWeight: 700, color: PL.green }}>Analysing your best payment option...</span>
             </div>
-            <AgentProgressBar agentStatus={agentStatus} agents={AGENTS} />
+            <AgentProgressBar agentStatus={agentStatus} wave1={WAVE_1} wave2={WAVE_2} wave3={WAVE_3} events={events} />
           </div>
           <p style={{ fontSize: 12, color: PL.muted, textAlign: 'center' }}>
             Pine Labs offer data → 6 agents reasoning → 1 optimal recommendation
@@ -251,7 +251,7 @@ export default function CheckoutPage() {
       {phase === 'recommendation' && (
         <div>
           <div style={{ ...cardStyle, marginBottom: 16 }}>
-            <AgentProgressBar agentStatus={agentStatus} agents={AGENTS} />
+            <AgentProgressBar agentStatus={agentStatus} wave1={WAVE_1} wave2={WAVE_2} wave3={WAVE_3} events={events} />
           </div>
           <RecommendationCard recommendation={recommendation} onApply={handleApply} loading={applying} />
         </div>

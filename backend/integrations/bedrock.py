@@ -20,12 +20,25 @@ def get_llm():
     return _lmstudio_llm()
 
 
-def _lmstudio_llm():
+def get_thinking_llm():
+    """
+    Return LLM with reduced max_tokens for thinking/analysis phases.
+    Helps avoid context overflow when agents do extensive reasoning.
+    Use this for intermediate reasoning steps, keep get_llm() for final outputs.
+    """
+    if settings.LLM_PROVIDER == "bedrock":
+        return _bedrock_llm(max_tokens=512)
+    return _lmstudio_llm(max_tokens=512)
+
+
+def _lmstudio_llm(max_tokens=1024):
     """
     LM Studio exposes an OpenAI-compatible API at localhost:1234.
     Install: https://lmstudio.ai  → load any model → start local server.
     
     Uses crewai.LLM with 'openai/' prefix so LiteLLM routes it correctly.
+    Args:
+      max_tokens: 1024 for full output, 512 for thinking phases
     """
     from crewai import LLM
     return LLM(
@@ -37,10 +50,12 @@ def _lmstudio_llm():
     )
 
 
-def _bedrock_llm():
+def _bedrock_llm(max_tokens=1024):
     """
     AWS Bedrock — Claude 3 Sonnet.
     Requires: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY in env (or IAM role).
+    Args:
+      max_tokens: 1024 for full output, 512 for thinking phases
     """
     import boto3
     from langchain_aws import ChatBedrock
@@ -48,5 +63,5 @@ def _bedrock_llm():
     return ChatBedrock(
         client=client,
         model_id=settings.BEDROCK_MODEL_ID,
-        model_kwargs={"max_tokens": 1024, "temperature": 0.1},
+        model_kwargs={"max_tokens": max_tokens, "temperature": 0.1},
     )
