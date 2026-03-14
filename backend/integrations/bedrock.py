@@ -1,11 +1,11 @@
 """
 Dual LLM backend:
   - LM Studio  → local testing (OpenAI-compatible endpoint at localhost:1234)
-  - AWS Bedrock → hackathon hosted run (Claude 3 Sonnet)
+  - AWS Bedrock → hackathon hosted run (Claude Opus 4.6)
 
 Switch via LLM_PROVIDER in .env:
   LLM_PROVIDER=lmstudio   (default, works offline)
-  LLM_PROVIDER=bedrock    (requires AWS creds in env)
+  LLM_PROVIDER=bedrock    (requires BEDROCK_API_KEY in env)
 
 CrewAI agents receive an `llm` object — both routes return something CrewAI accepts.
 
@@ -13,7 +13,16 @@ IMPORTANT: qwen3-8b has a <think> mode that consumes 500+ tokens BEFORE answerin
            Disabled via extra_body to preserve token budget for JSON output.
 """
 
+import os
+import boto3
+import logging
+from botocore.exceptions import ClientError
 from backend.config import settings
+
+logger = logging.getLogger(__name__)
+
+# Global boto3 client for Bedrock
+_bedrock_client = None
 
 
 def get_llm():
@@ -44,23 +53,53 @@ def _lmstudio_llm():
     )
 
 
+def _get_bedrock_client():
+    """Get or create boto3 Bedrock client with bearer token authentication."""
+    global _bedrock_client
+    
+    if _bedrock_client is not None:
+        return _bedrock_client
+    
+    brt = boto3.client(
+        "bedrock-runtime",
+        region_name=settings.BEDROCK_REGION,
+        aws_access_key_id="",      # Leave empty when using bearer token
+        aws_secret_access_key="",  # Leave empty when using bearer token
+    )
+    
+    # Register bearer token in request headers
+    def add_bearer_token(event_name, **kwargs):
+        if 'params' in kwargs:
+            if 'headers' not in kwargs['params']:
+                kwargs['params']['headers'] = {}
+            kwargs['params']['headers']['Authorization'] = f'Bearer {settings.BEDROCK_API_KEY}'
+    
+    brt.meta.events.register('before-call', add_bearer_token)
+    _bedrock_client = brt
+    return brt
+
+
 def _bedrock_llm():
     """
-    AWS Bedrock — Claude via LiteLLM (crewai.LLM).
-    Uses temporary STS credentials loaded from .env.
-    Requires: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN in env.
+    AWS Bedrock — Claude Opus 4.6 using boto3 with bearer token authentication.
+    Returns a CrewAI LLM object using Bedrock provider.
     """
-    import os
     from crewai import LLM
-
-    # Ensure boto3/LiteLLM picks up temporary credentials from settings
-    os.environ["AWS_ACCESS_KEY_ID"] = settings.AWS_ACCESS_KEY_ID
-    os.environ["AWS_SECRET_ACCESS_KEY"] = settings.AWS_SECRET_ACCESS_KEY
-    os.environ["AWS_SESSION_TOKEN"] = settings.AWS_SESSION_TOKEN
-    os.environ["AWS_DEFAULT_REGION"] = settings.BEDROCK_REGION
-
+    
+    logger.info(f"🔐 Bedrock Configuration:")
+    logger.info(f"   BEDROCK_REGION: {settings.BEDROCK_REGION}")
+    logger.info(f"   BEDROCK_MODEL_ID: {settings.BEDROCK_MODEL_ID}")
+    logger.info(f"   API Key Present: {bool(settings.BEDROCK_API_KEY)}")
+    
+    # Format model ID for LiteLLM: bedrock/<model-id>
+    # This tells LiteLLM to use Bedrock provider
+    bedrock_model = f"bedrock/{settings.BEDROCK_MODEL_ID}"
+    
+    # Return CreawAI LLM object for Bedrock
+    # LiteLLM will route to Bedrock handler based on "bedrock/" prefix
     return LLM(
-        model=f"bedrock/{settings.BEDROCK_MODEL_ID}",
+        model=bedrock_model,  # e.g., "bedrock/us.anthropic.claude-opus-4-6-v1"
         temperature=0.1,
         max_tokens=1024,
     )
+
